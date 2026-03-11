@@ -47,6 +47,12 @@ const routes = [
         component: () => import('@/views/inventory/Index.vue'),
         meta: { title: '资产盘点' }
       },
+      {
+        path: 'settings/wechat',
+        name: 'WechatSettings',
+        component: () => import('@/views/settings/Wechat.vue'),
+        meta: { title: '微信通知设置' }
+      },
     ]
   }
 ]

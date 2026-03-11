@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Asset;
 use App\Models\AssetHistory;
 use App\Models\User;
+use App\Services\WechatNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,12 @@ use Illuminate\Validation\Rule;
 
 class AssetController extends Controller
 {
+    private $wechatService;
+
+    public function __construct(WechatNotificationService $wechatService)
+    {
+        $this->wechatService = $wechatService;
+    }
     public function index(Request $request): JsonResponse
     {
         $query = Asset::query()->with('category', 'department', 'user', 'supplier');
@@ -229,6 +236,11 @@ class AssetController extends Controller
             'target_department_id' => $validated['department_id'],
         ]);
 
+        // 发送微信通知
+        if (config('services.wechat.notifications.asset_changed', true)) {
+            $this->wechatService->sendAssetChanged($asset->load('user', 'department'), 'checkout', null, $user);
+        }
+
         return response()->json([
             'success' => true,
             'message' => '资产分配成功',
@@ -260,13 +272,20 @@ class AssetController extends Controller
         ]);
 
         // 记录历史
+        $previousUser = $asset->user;
         AssetHistory::create([
             'asset_id' => $asset->id,
             'user_id' => auth()->id(),
             'action' => 'checkin',
             'notes' => $validated['notes'] ?? '资产归还',
-            'target_user_id' => $asset->user_id,
+            'target_user_id' => $previousUser->id ?? null,
         ]);
+
+        // 发送微信通知
+        if (config('services.wechat.notifications.asset_changed', true)) {
+            $asset->refresh();
+            $this->wechatService->sendAssetChanged($asset, 'checkin', $previousUser, null);
+        }
 
         return response()->json([
             'success' => true,

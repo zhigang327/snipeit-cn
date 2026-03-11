@@ -39,6 +39,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/inventories/{inventory}/scan', [\App\Http\Controllers\InventoryController::class, 'scanAsset']);
     Route::get('/inventories/{inventory}/progress', [\App\Http\Controllers\InventoryController::class, 'progress']);
     Route::post('/inventories/{inventory}/complete', [\App\Http\Controllers\InventoryController::class, 'complete']);
+
+    // 微信配置
+    Route::get('/wechat/config', [\App\Http\Controllers\WechatConfigController::class, 'getConfig']);
+    Route::put('/wechat/config', [\App\Http\Controllers\WechatConfigController::class, 'updateConfig']);
+    Route::post('/wechat/test', [\App\Http\Controllers\WechatConfigController::class, 'testNotification']);
+    Route::get('/wechat/notifications', [
+        \App\Http\Controllers\WechatConfigController::class, 'getNotificationSettings']);
+    Route::put('/wechat/notifications', [
+        \App\Http\Controllers\WechatConfigController::class, 'updateNotificationSettings']);
 });
 
 Route::get('/', function () {

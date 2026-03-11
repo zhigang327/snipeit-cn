@@ -4,11 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\Inventory;
+use App\Services\WechatNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class InventoryController extends Controller
 {
+    private $wechatService;
+
+    public function __construct(WechatNotificationService $wechatService)
+    {
+        $this->wechatService = $wechatService;
+    }
     /**
      * 开始盘点
      */
@@ -27,6 +34,11 @@ class InventoryController extends Controller
             'status' => 'in_progress',
             'created_by' => auth()->id(),
         ]);
+
+        // 发送微信通知
+        if (config('services.wechat.notifications.inventory_created', true)) {
+            $this->wechatService->sendInventoryTask($inventory->load('creator'));
+        }
 
         return response()->json([
             'success' => true,
@@ -118,7 +130,8 @@ class InventoryController extends Controller
         $inventory->update([
             'status' => 'completed',
             'completed_at' => now(),
-            'notes' => $request->notes ?? ''
+            'notes' => $request->notes ?? '',
+            'completed_by' => auth()->id(),
         ]);
 
         // 更新资产状态
@@ -130,6 +143,12 @@ class InventoryController extends Controller
             } elseif ($item->status === 'damaged') {
                 $asset->update(['status' => 'broken']);
             }
+        }
+
+        // 发送微信通知
+        if (config('services.wechat.notifications.inventory_completed', true)) {
+            $inventory->refresh();
+            $this->wechatService->sendInventoryCompleted($inventory->load('completer'));
         }
 
         return response()->json([
