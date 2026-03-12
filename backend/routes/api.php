@@ -81,6 +81,33 @@ Route::middleware('auth:sanctum')->group(function () {
         \App\Http\Controllers\MaintenanceController::class, 'assetHistory']);
     Route::post('/maintenance/export', [
         \App\Http\Controllers\MaintenanceController::class, 'export']);
+
+    // 借用管理
+    Route::apiResource('borrow', \App\Http\Controllers\BorrowController::class);
+    Route::post('/borrow/{borrow}/approve', [
+        \App\Http\Controllers\BorrowController::class, 'approve']);
+    Route::post('/borrow/{borrow}/reject', [
+        \App\Http\Controllers\BorrowController::class, 'reject']);
+    Route::post('/borrow/{borrow}/confirm-borrow', [
+        \App\Http\Controllers\BorrowController::class, 'confirmBorrow']);
+    Route::post('/borrow/{borrow}/return', [
+        \App\Http\Controllers\BorrowController::class, 'returnAsset']);
+    Route::post('/borrow/{borrow}/cancel', [
+        \App\Http\Controllers\BorrowController::class, 'cancel']);
+    Route::get('/borrow/statistics', [
+        \App\Http\Controllers\BorrowController::class, 'statistics']);
+    Route::get('/borrow/overdue', [
+        \App\Http\Controllers\BorrowController::class, 'overdue']);
+    Route::get('/borrow/check-overdue', [
+        \App\Http\Controllers\BorrowController::class, 'checkOverdue']);
+    Route::get('/borrow/upcoming-due', [
+        \App\Http\Controllers\BorrowController::class, 'upcomingDue']);
+    Route::get('/assets/{asset}/borrow/history', [
+        \App\Http\Controllers\BorrowController::class, 'assetHistory']);
+    Route::get('/users/{user?}/borrow/history', [
+        \App\Http\Controllers\BorrowController::class, 'userHistory']);
+    Route::post('/borrow/export', [
+        \App\Http\Controllers\BorrowController::class, 'export']);
 });
 
 Route::get('/', function () {

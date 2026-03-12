@@ -40,6 +40,7 @@ return [
             'inventory_created' => env('WECHAT_NOTIFY_INVENTORY_CREATED', true),
             'inventory_completed' => env('WECHAT_NOTIFY_INVENTORY_COMPLETED', true),
             'maintenance' => env('WECHAT_NOTIFY_MAINTENANCE', true),
+            'borrow' => env('WECHAT_NOTIFY_BORROW', true),
         ],
     ],
 

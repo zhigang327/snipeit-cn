@@ -65,6 +65,12 @@ const routes = [
         component: () => import('@/views/maintenance/Index.vue'),
         meta: { title: '维修记录管理' }
       },
+      {
+        path: 'borrow',
+        name: 'Borrow',
+        component: () => import('@/views/borrow/Index.vue'),
+        meta: { title: '借用管理' }
+      },
     ]
   }
 ]

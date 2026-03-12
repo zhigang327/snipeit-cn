@@ -99,6 +99,16 @@ class Asset extends Model
         return $this->hasMany(MaintenanceRecord::class)->orderBy('reported_date', 'desc');
     }
 
+    public function borrowRecords()
+    {
+        return $this->hasMany(BorrowRecord::class)->orderBy('created_at', 'desc');
+    }
+
+    public function currentBorrow()
+    {
+        return $this->hasOne(BorrowRecord::class)->where('status', 'borrowed')->latest();
+    }
+
     public function scopeAssigned($query)
     {
         return $query->where('status', 'assigned');
