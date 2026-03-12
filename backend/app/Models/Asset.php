@@ -34,6 +34,12 @@ class Asset extends Model
         'image',
         'warranty_months',
         'qr_code',
+        'depreciation_method',
+        'salvage_value',
+        'useful_life_years',
+        'current_book_value',
+        'last_depreciation_date',
+        'accumulated_depreciation',
     ];
 
     protected $casts = [
@@ -42,6 +48,10 @@ class Asset extends Model
         'checkout_date' => 'date',
         'expected_checkin_date' => 'date',
         'warranty_months' => 'integer',
+        'salvage_value' => 'decimal:2',
+        'current_book_value' => 'decimal:2',
+        'last_depreciation_date' => 'date',
+        'accumulated_depreciation' => 'decimal:2',
     ];
 
     public function category()
@@ -77,6 +87,11 @@ class Asset extends Model
     public function histories()
     {
         return $this->hasMany(AssetHistory::class);
+    }
+
+    public function depreciationRecords()
+    {
+        return $this->hasMany(DepreciationRecord::class)->orderBy('depreciation_date', 'desc');
     }
 
     public function scopeAssigned($query)

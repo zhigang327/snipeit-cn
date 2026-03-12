@@ -182,7 +182,7 @@ docker-compose exec -T mysql mysql -u root -p snipe_cn < backup.sql
 - [ ] 移动端适配
 - [x] 微信通知集成
 - [x] 条码/二维码打印
-- [ ] 资产折旧计算
+- [x] 资产折旧计算
 - [ ] 资产维修记录
 - [ ] API接口文档(Swagger)
 - [ ] Excel批量导入导出

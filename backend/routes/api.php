@@ -48,11 +48,27 @@ Route::middleware('auth:sanctum')->group(function () {
         \App\Http\Controllers\WechatConfigController::class, 'getNotificationSettings']);
     Route::put('/wechat/notifications', [
         \App\Http\Controllers\WechatConfigController::class, 'updateNotificationSettings']);
+
+    // 折旧管理
+    Route::get('/assets/{asset}/depreciation/calculate', [
+        \App\Http\Controllers\DepreciationController::class, 'calculate']);
+    Route::post('/assets/{asset}/depreciation/execute', [
+        \App\Http\Controllers\DepreciationController::class, 'execute']);
+    Route::get('/assets/{asset}/depreciation/records', [
+        \App\Http\Controllers\DepreciationController::class, 'records']);
+    Route::get('/assets/{asset}/depreciation/schedule', [
+        \App\Http\Controllers\DepreciationController::class, 'schedule']);
+    Route::post('/depreciation/batch', [
+        \App\Http\Controllers\DepreciationController::class, 'executeBatch']);
+    Route::get('/depreciation/report', [
+        \App\Http\Controllers\DepreciationController::class, 'report']);
+    Route::get('/depreciation/statistics', [
+        \App\Http\Controllers\DepreciationController::class, 'statistics']);
 });
 
 Route::get('/', function () {
     return response()->json([
         'message' => 'Snipe-CN API',
-        'version' => '1.0.0',
+        'version' => '1.1.0',
     ]);
 });

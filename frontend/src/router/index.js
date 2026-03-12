@@ -48,6 +48,12 @@ const routes = [
         meta: { title: '资产盘点' }
       },
       {
+        path: 'depreciation',
+        name: 'Depreciation',
+        component: () => import('@/views/depreciation/Index.vue'),
+        meta: { title: '资产折旧' }
+      },
+      {
         path: 'settings/wechat',
         name: 'WechatSettings',
         component: () => import('@/views/settings/Wechat.vue'),
