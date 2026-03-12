@@ -1,0 +1,62 @@
+# Snipe-CN前端稳定版Dockerfile
+# 版本: 1.6.0-stable
+# 包含国内镜像加速和构建优化
+
+FROM node:18-alpine
+
+# 设置时区
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# 安装必要的系统工具
+RUN apk update && apk add --no-cache \
+    git \
+    curl \
+    wget \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/cache/apk/*
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制package配置文件
+COPY package.json package-lock.json ./
+
+# 配置npm国内镜像（如果在中国大陆）
+RUN npm config set registry https://registry.npmmirror.com/
+
+# 清理npm缓存
+RUN npm cache clean --force
+
+# 安装依赖（三重保障方案）
+RUN echo "开始安装Node.js依赖..." && \
+    # 方法1: 标准安装
+    npm install --no-audit --progress=false || \
+    # 方法2: 如果方法1失败，清理缓存后重试
+    (echo "第一次安装失败，清理缓存后重试..." && \
+     npm cache clean --force && \
+     npm install --no-audit --progress=false --legacy-peer-deps) || \
+    # 方法3: 如果仍然失败，使用CI模式
+    (echo "前两次安装失败，使用CI模式..." && \
+     npm ci --no-audit --progress=false)
+
+# 复制源代码
+COPY . .
+
+# 构建应用（生产环境）
+RUN if [ "$NODE_ENV" = "production" ]; then \
+        echo "构建生产版本..." && \
+        npm run build; \
+    fi
+
+# 暴露端口
+EXPOSE 5173
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:5173', (res) => { if(res.statusCode === 200) process.exit(0); else process.exit(1); })" || exit 1
+
+# 启动命令
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

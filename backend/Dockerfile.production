@@ -1,55 +1,79 @@
-# Snipe-CN官方稳定版Dockerfile
-# 版本: 1.6.0-stable
-# 日期: 2026-03-12
-# 特点: 整合所有历史问题解决方案，构建成功率100%
+# Snipe-CN生产环境Dockerfile
+# 精简版，专为生产环境优化，构建速度快，稳定性高
+FROM php:8.2-fpm-alpine
 
-FROM php:8.2-fpm
-
-# 基础配置
+# 设置时区
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 系统依赖安装
-RUN apt-get update && apt-get install -y \
+# 安装Alpine系统依赖（轻量级）
+RUN apk update && apk add --no-cache \
+    git \
     curl \
     wget \
-    git \
     libpng-dev \
-    libonig-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    libwebp-dev \
     libxml2-dev \
     libzip-dev \
     zip \
     unzip \
-    && rm -rf /var/lib/apt/lists/*
+    g++ \
+    make \
+    autoconf \
+    pkgconfig \
+    icu-dev \
+    oniguruma-dev \
+    postgresql-dev \
+    sqlite-dev \
+    linux-headers
 
-# PHP扩展安装（生产环境必须的扩展）
-RUN docker-php-ext-install \
+# 安装PHP扩展（Alpine版本）
+RUN docker-php-ext-configure gd \
+    --with-freetype \
+    --with-jpeg \
+    --with-webp
+
+RUN docker-php-ext-install -j$(nproc) \
     pdo \
     pdo_mysql \
-    mbstring \
+    pdo_pgsql \
+    pdo_sqlite \
     bcmath \
+    mbstring \
+    exif \
+    pcntl \
     zip \
-    opcache
+    opcache \
+    intl \
+    gd \
+    sockets
 
-# 安装Composer（使用多阶段构建避免网络问题）
+# 安装Redis扩展
+RUN pecl install redis && docker-php-ext-enable redis
+
+# 安装Composer（使用官方镜像）
 COPY --from=composer:2.6.6 /usr/bin/composer /usr/bin/composer
 
 # 设置工作目录
 WORKDIR /var/www/html
 
-# 复制composer配置
+# 复制composer配置文件
 COPY composer.json composer.lock ./
 
-# 设置Composer国内镜像（确保网络稳定性）
-RUN composer config -g repo.packagist composer https://mirrors.aliyun.com/composer/
+# 方法1：使用国内镜像（如果网络环境需要）
+RUN composer config -g repo.packagist composer https://mirrors.aliyun.com/composer/ || true
+
+# 方法2：使用官方源（默认）
+# RUN composer config -g repo.packagist composer https://repo.packagist.org
 
 # 清理缓存
 RUN composer clear-cache
 
-# 安装依赖（三重保障方案）
-RUN set -ex; \
-    echo "开始安装PHP依赖..."; \
-    # 方法1: 标准安装
+# 安装生产环境依赖（使用多种选项确保成功）
+RUN set -e; \
+    # 尝试方法1：标准安装
     composer install \
         --no-dev \
         --optimize-autoloader \
@@ -57,10 +81,11 @@ RUN set -ex; \
         --no-scripts \
         --prefer-dist \
         --ignore-platform-reqs \
+        --verbose \
     || \
-    # 方法2: 如果方法1失败，清理缓存后重试
+    # 如果失败，尝试方法2：清理缓存后重试
     ( \
-        echo "第一次安装失败，清理缓存后重试..."; \
+        echo "第一次尝试失败，清理缓存后重试..."; \
         composer clear-cache; \
         composer install \
             --no-dev \
@@ -70,11 +95,12 @@ RUN set -ex; \
             --prefer-dist \
             --ignore-platform-reqs \
             --prefer-stable \
+            --verbose \
     ) \
     || \
-    # 方法3: 如果仍然失败，使用最小化安装
+    # 如果仍然失败，尝试方法3：最小化安装
     ( \
-        echo "前两次安装失败，使用最小化安装..."; \
+        echo "前两次尝试失败，使用最小化安装..."; \
         composer install \
             --no-dev \
             --no-interaction \
@@ -116,18 +142,21 @@ RUN if ! grep -q "^APP_KEY=" .env; then \
 
 # 优化应用
 RUN composer dump-autoload --optimize && \
-    php artisan optimize
+    php artisan optimize && \
+    php artisan config:cache && \
+    php artisan route:cache && \
+    php artisan view:cache
 
 # 清理
-RUN apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN composer clear-cache && \
+    rm -rf /tmp/* /var/tmp/*
 
 # 暴露端口
 EXPOSE 9000
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
-    CMD php -r "echo 'OK'; exit(0);" || exit 1
+    CMD php -r "echo 'PHP is running'; exit(0);" || exit 1
 
 # 启动命令
 CMD ["php-fpm"]

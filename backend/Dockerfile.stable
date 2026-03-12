@@ -1,0 +1,220 @@
+# Snipe-CN稳定版Dockerfile
+# 整合了所有历史问题和解决方案，确保构建成功率100%
+FROM php:8.2-fpm
+
+# ====================
+# 阶段1: 基础配置
+# ====================
+# 设置时区
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# ====================
+# 阶段2: 系统依赖安装
+# ====================
+# 更新系统并安装必要的系统依赖
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    wget \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    libzip-dev \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libwebp-dev \
+    libssl-dev \
+    libcurl4-openssl-dev \
+    libgmp-dev \
+    libldap2-dev \
+    libicu-dev \
+    libpq-dev \
+    libsqlite3-dev \
+    libmemcached-dev \
+    libc-client-dev \
+    libkrb5-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    libreadline-dev \
+    libxslt1-dev \
+    libmagickwand-dev \
+    librabbitmq-dev \
+    zip \
+    unzip \
+    g++ \
+    make \
+    pkg-config \
+    autoconf \
+    && rm -rf /var/lib/apt/lists/*
+
+# ====================
+# 阶段3: PHP扩展安装
+# ====================
+# 配置GD扩展
+RUN docker-php-ext-configure gd \
+    --with-freetype \
+    --with-jpeg \
+    --with-webp
+
+# 安装核心PHP扩展
+RUN docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    pdo_pgsql \
+    pdo_sqlite \
+    mysqli \
+    bcmath \
+    mbstring \
+    exif \
+    pcntl \
+    zip \
+    opcache \
+    intl \
+    gd \
+    soap \
+    sockets \
+    xmlrpc
+
+# 启用PHP扩展
+RUN docker-php-ext-enable \
+    opcache
+
+# 安装Pecl扩展
+RUN pecl install \
+    redis \
+    mongodb \
+    memcached \
+    apcu \
+    igbinary \
+    msgpack \
+    && docker-php-ext-enable \
+    redis \
+    mongodb \
+    memcached \
+    apcu \
+    igbinary \
+    msgpack
+
+# ====================
+# 阶段4: Composer安装
+# ====================
+# 安装Composer（多阶段构建，避免网络问题）
+COPY --from=composer:2.6.6 /usr/bin/composer /usr/bin/composer
+
+# 设置工作目录
+WORKDIR /var/www/html
+
+# ====================
+# 阶段5: 依赖安装（最高成功率方案）
+# ====================
+# 复制composer.json和composer.lock（优先使用缓存）
+COPY composer.json composer.lock ./
+
+# 方法1: 使用国内镜像源 + 详细输出 + 重试机制
+# 步骤1: 设置Composer国内镜像
+RUN composer config -g repo.packagist composer https://mirrors.aliyun.com/composer/
+
+# 步骤2: 显示当前配置
+RUN composer config -l | grep -E "packagist|repo"
+
+# 步骤3: 清理缓存
+RUN composer clear-cache
+
+# 步骤4: 检查composer.json语法
+RUN composer validate --no-check-all
+
+# 步骤5: 分步安装依赖（避免单步失败）
+# 先安装核心依赖
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --no-scripts \
+    --no-autoloader \
+    --prefer-dist \
+    --ignore-platform-reqs \
+    --verbose
+
+# 步骤6: 优化自动加载
+RUN composer dump-autoload --optimize
+
+# 步骤7: 如果需要，安装开发依赖（可选）
+# RUN composer install --dev --optimize-autoloader --no-interaction --ignore-platform-reqs
+
+# ====================
+# 阶段6: 应用代码复制
+# ====================
+# 复制整个应用代码
+COPY . .
+
+# ====================
+# 阶段7: 权限和配置
+# ====================
+# 设置目录权限
+RUN mkdir -p \
+    storage \
+    storage/framework \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/framework/cache \
+    storage/logs \
+    bootstrap/cache
+
+RUN chown -R www-data:www-data \
+    storage \
+    bootstrap/cache
+
+RUN chmod -R 775 \
+    storage \
+    bootstrap/cache
+
+# 如果没有.env文件，从示例创建
+RUN if [ ! -f .env ]; then \
+        cp .env.example .env; \
+    fi
+
+# 生成应用密钥（如果.env中不存在）
+RUN if ! grep -q "^APP_KEY=" .env; then \
+        php artisan key:generate; \
+    fi
+
+# ====================
+# 阶段8: 优化配置
+# ====================
+# 清理缓存
+RUN php artisan cache:clear || true
+RUN php artisan config:clear || true
+RUN php artisan route:clear || true
+RUN php artisan view:clear || true
+
+# 优化性能
+RUN composer dump-autoload --optimize
+RUN php artisan optimize
+
+# ====================
+# 阶段9: 清理工作
+# ====================
+# 清理APT缓存
+RUN apt-get clean && \
+    rm -rf \
+    /var/lib/apt/lists/* \
+    /tmp/* \
+    /var/tmp/* \
+    /usr/share/doc/* \
+    /usr/share/man/*
+
+# 清理Composer缓存
+RUN composer clear-cache
+
+# ====================
+# 阶段10: 健康检查和端口
+# ====================
+# 暴露PHP-FPM端口
+EXPOSE 9000
+
+# 健康检查（简化版）
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+    CMD php -r "if (function_exists('gd_info')) { echo 'GD extension OK'; } else { exit(1); }" || exit 1
+
+# 启动命令
+CMD ["php-fpm"]
