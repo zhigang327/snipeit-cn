@@ -94,6 +94,11 @@ class Asset extends Model
         return $this->hasMany(DepreciationRecord::class)->orderBy('depreciation_date', 'desc');
     }
 
+    public function maintenanceRecords()
+    {
+        return $this->hasMany(MaintenanceRecord::class)->orderBy('reported_date', 'desc');
+    }
+
     public function scopeAssigned($query)
     {
         return $query->where('status', 'assigned');

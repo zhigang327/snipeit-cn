@@ -59,6 +59,12 @@ const routes = [
         component: () => import('@/views/settings/Wechat.vue'),
         meta: { title: '微信通知设置' }
       },
+      {
+        path: 'maintenance',
+        name: 'Maintenance',
+        component: () => import('@/views/maintenance/Index.vue'),
+        meta: { title: '维修记录管理' }
+      },
     ]
   }
 ]

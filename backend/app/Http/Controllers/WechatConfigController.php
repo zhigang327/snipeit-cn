@@ -89,6 +89,7 @@ class WechatConfigController extends Controller
             'asset_changed' => Config::get('services.wechat.notifications.asset_changed', true),
             'inventory_created' => Config::get('services.wechat.notifications.inventory_created', true),
             'inventory_completed' => Config::get('services.wechat.notifications.inventory_completed', true),
+            'maintenance' => Config::get('services.wechat.notifications.maintenance', true),
         ]);
     }
 
@@ -102,6 +103,7 @@ class WechatConfigController extends Controller
             'asset_changed' => 'boolean',
             'inventory_created' => 'boolean',
             'inventory_completed' => 'boolean',
+            'maintenance' => 'boolean',
         ]);
 
         $configPath = config_path('services.php');

@@ -39,6 +39,7 @@ return [
             'asset_changed' => env('WECHAT_NOTIFY_ASSET_CHANGED', true),
             'inventory_created' => env('WECHAT_NOTIFY_INVENTORY_CREATED', true),
             'inventory_completed' => env('WECHAT_NOTIFY_INVENTORY_COMPLETED', true),
+            'maintenance' => env('WECHAT_NOTIFY_MAINTENANCE', true),
         ],
     ],
 

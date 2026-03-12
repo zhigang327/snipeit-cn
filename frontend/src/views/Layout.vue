@@ -29,6 +29,10 @@
           <el-icon><TrendCharts /></el-icon>
           <span>资产折旧</span>
         </el-menu-item>
+        <el-menu-item index="/maintenance">
+          <el-icon><Tools /></el-icon>
+          <span>维修记录</span>
+        </el-menu-item>
         <el-menu-item index="/users">
           <el-icon><User /></el-icon>
           <span>用户管理</span>

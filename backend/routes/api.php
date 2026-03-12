@@ -64,6 +64,23 @@ Route::middleware('auth:sanctum')->group(function () {
         \App\Http\Controllers\DepreciationController::class, 'report']);
     Route::get('/depreciation/statistics', [
         \App\Http\Controllers\DepreciationController::class, 'statistics']);
+
+    // 维修管理
+    Route::apiResource('maintenance', \App\Http\Controllers\MaintenanceController::class);
+    Route::post('/maintenance/{maintenance}/assign', [
+        \App\Http\Controllers\MaintenanceController::class, 'assign']);
+    Route::post('/maintenance/{maintenance}/complete', [
+        \App\Http\Controllers\MaintenanceController::class, 'complete']);
+    Route::post('/maintenance/{maintenance}/cancel', [
+        \App\Http\Controllers\MaintenanceController::class, 'cancel']);
+    Route::get('/maintenance/statistics', [
+        \App\Http\Controllers\MaintenanceController::class, 'statistics']);
+    Route::get('/maintenance/overdue', [
+        \App\Http\Controllers\MaintenanceController::class, 'overdue']);
+    Route::get('/assets/{asset}/maintenance/history', [
+        \App\Http\Controllers\MaintenanceController::class, 'assetHistory']);
+    Route::post('/maintenance/export', [
+        \App\Http\Controllers\MaintenanceController::class, 'export']);
 });
 
 Route::get('/', function () {
