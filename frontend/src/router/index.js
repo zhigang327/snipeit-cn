@@ -71,6 +71,12 @@ const routes = [
         component: () => import('@/views/borrow/Index.vue'),
         meta: { title: '借用管理' }
       },
+      {
+        path: 'disposal',
+        name: 'Disposal',
+        component: () => import('@/views/disposal/Index.vue'),
+        meta: { title: '报废管理' }
+      },
     ]
   }
 ]

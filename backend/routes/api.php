@@ -108,6 +108,25 @@ Route::middleware('auth:sanctum')->group(function () {
         \App\Http\Controllers\BorrowController::class, 'userHistory']);
     Route::post('/borrow/export', [
         \App\Http\Controllers\BorrowController::class, 'export']);
+
+    // 报废管理
+    Route::apiResource('disposal', \App\Http\Controllers\DisposalController::class);
+    Route::post('/disposal/{disposal}/approve', [
+        \App\Http\Controllers\DisposalController::class, 'approve']);
+    Route::post('/disposal/{disposal}/reject', [
+        \App\Http\Controllers\DisposalController::class, 'reject']);
+    Route::post('/disposal/{disposal}/complete', [
+        \App\Http\Controllers\DisposalController::class, 'complete']);
+    Route::post('/disposal/{disposal}/cancel', [
+        \App\Http\Controllers\DisposalController::class, 'cancel']);
+    Route::get('/disposal/statistics', [
+        \App\Http\Controllers\DisposalController::class, 'statistics']);
+    Route::get('/disposal/overdue', [
+        \App\Http\Controllers\DisposalController::class, 'overdue']);
+    Route::get('/assets/{asset}/disposal/history', [
+        \App\Http\Controllers\DisposalController::class, 'assetHistory']);
+    Route::post('/disposal/export', [
+        \App\Http\Controllers\DisposalController::class, 'export']);
 });
 
 Route::get('/', function () {

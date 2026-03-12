@@ -109,6 +109,16 @@ class Asset extends Model
         return $this->hasOne(BorrowRecord::class)->where('status', 'borrowed')->latest();
     }
 
+    public function disposalRecords()
+    {
+        return $this->hasMany(DisposalRecord::class)->orderBy('created_at', 'desc');
+    }
+
+    public function latestDisposal()
+    {
+        return $this->hasOne(DisposalRecord::class)->latest();
+    }
+
     public function scopeAssigned($query)
     {
         return $query->where('status', 'assigned');
