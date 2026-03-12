@@ -110,13 +110,41 @@ full_deployment() {
     
     # 4. 构建Docker镜像
     print_info "构建Docker镜像（这可能需要几分钟）..."
-    docker-compose build
     
-    if [ $? -eq 0 ]; then
+    # 第一次尝试构建
+    if docker-compose build; then
         print_success "Docker镜像构建完成"
     else
-        print_error "Docker镜像构建失败"
-        exit 1
+        print_warning "首次构建失败，尝试使用修复脚本..."
+        
+        # 运行构建修复脚本
+        if [ -f "scripts/fix-build.sh" ]; then
+            chmod +x scripts/fix-build.sh
+            if ./scripts/fix-build.sh --step-build; then
+                print_success "通过分步构建修复成功"
+            else
+                print_error "构建修复失败，尝试清理缓存后重新构建..."
+                
+                # 清理缓存后重试
+                ./scripts/fix-build.sh --clean-cache
+                sleep 5
+                
+                if docker-compose build --no-cache; then
+                    print_success "清理缓存后构建成功"
+                else
+                    print_error "所有构建尝试都失败"
+                    print_info "请检查："
+                    print_info "1. 网络连接是否正常"
+                    print_info "2. Docker服务是否运行"
+                    print_info "3. 查看详细错误: docker-compose build --no-cache"
+                    exit 1
+                fi
+            fi
+        else
+            print_error "构建修复脚本不存在"
+            print_info "请手动检查错误并修复"
+            exit 1
+        fi
     fi
     
     # 5. 启动服务

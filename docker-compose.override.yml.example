@@ -1,0 +1,75 @@
+# Docker Compose 覆盖配置文件示例
+# 将此文件复制为 docker-compose.override.yml 并根据需要修改
+
+version: '3.8'
+
+services:
+  backend:
+    build:
+      args:
+        # Composer镜像设置
+        COMPOSER_MIRROR: "https://mirrors.aliyun.com/composer/"
+        # PHP内存限制
+        PHP_MEMORY_LIMIT: "512M"
+    environment:
+      # Composer环境变量
+      COMPOSER_ALLOW_SUPERUSER: 1
+      COMPOSER_MEMORY_LIMIT: -1
+      COMPOSER_DISABLE_XDEBUG_WARN: 1
+      # PHP设置
+      PHP_OPCACHE_ENABLE: 1
+      PHP_OPCACHE_MEMORY_CONSUMPTION: 256
+    volumes:
+      # 挂载Composer缓存目录，加速后续构建
+      - ~/.composer/cache:/tmp/composer-cache:delegated
+    # 构建时的额外命令
+    command: >
+      sh -c "
+        # 等待MySQL服务就绪
+        while ! nc -z mysql 3306; do
+          echo '等待MySQL启动...';
+          sleep 2;
+        done;
+        
+        # 运行PHP-FPM
+        php-fpm
+      "
+
+  mysql:
+    # MySQL性能优化配置
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --max-allowed-packet=64M
+      --innodb-buffer-pool-size=1G
+      --innodb-log-file-size=256M
+
+  frontend:
+    environment:
+      # Node.js npm镜像设置
+      NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+      # 前端构建参数
+      NODE_ENV: "production"
+      # 禁用交互式提示
+      CI: "true"
+
+volumes:
+  mysql_data:
+    # 自定义MySQL数据卷配置
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}/data/mysql
+      o: bind
+
+  redis_data:
+    driver: local
+
+networks:
+  snipe-cn-network:
+    # 自定义网络配置
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

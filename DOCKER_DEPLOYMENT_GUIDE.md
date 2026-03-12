@@ -508,14 +508,19 @@ docker-compose exec backend cat config/cors.php
 
 **问题4: 镜像构建失败**
 ```bash
-# 错误信息: npm ERR! 或 composer ERR!
+# 错误信息: npm ERR! 或 composer ERR! (或具体错误: process "/bin/sh -c composer install" did not complete successfully)
 
-# 解决方案:
-# 1. 清理缓存重新构建
+# 解决方案（选择一种）:
+
+# 方案1: 使用构建修复脚本（推荐）
+chmod +x scripts/fix-build.sh
+./scripts/fix-build.sh --all
+
+# 方案2: 配置国内镜像加速并清理缓存
 docker-compose build --no-cache
 
-# 2. 使用国内镜像源
-# 创建.docker/config.json
+# 方案3: 手动配置国内镜像源
+# 创建 /etc/docker/daemon.json
 {
   "registry-mirrors": [
     "https://docker.mirrors.ustc.edu.cn",
