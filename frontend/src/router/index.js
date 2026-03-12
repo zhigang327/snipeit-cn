@@ -77,6 +77,12 @@ const routes = [
         component: () => import('@/views/disposal/Index.vue'),
         meta: { title: '报废管理' }
       },
+      {
+        path: 'inventory',
+        name: 'Inventory',
+        component: () => import('@/views/inventory/Index.vue'),
+        meta: { title: '盘点管理' }
+      },
     ]
   }
 ]

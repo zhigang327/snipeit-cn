@@ -41,6 +41,10 @@
           <el-icon><Delete /></el-icon>
           <span>报废管理</span>
         </el-menu-item>
+        <el-menu-item index="/inventory">
+          <el-icon><Histogram /></el-icon>
+          <span>盘点管理</span>
+        </el-menu-item>
         <el-menu-item index="/users">
           <el-icon><User /></el-icon>
           <span>用户管理</span>

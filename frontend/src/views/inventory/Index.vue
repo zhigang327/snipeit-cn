@@ -1,545 +1,1173 @@
 <template>
-  <div class="inventory-page">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>资产盘点</span>
-          <el-button type="primary" @click="handleStartInventory">开始盘点</el-button>
-        </div>
-      </template>
+  <div class="inventory-management">
+    <!-- 顶部工具栏 -->
+    <div class="toolbar">
+      <div class="left">
+        <el-button type="primary" @click="handleCreateTask">
+          <el-icon><Plus /></el-icon>
+          新建盘点任务
+        </el-button>
+        <el-button @click="handleQuickInventory">
+          <el-icon><DocumentChecked /></el-icon>
+          快速盘点
+        </el-button>
+        <el-button @click="handleScanQR">
+          <el-icon><Camera /></el-icon>
+          扫码盘点
+        </el-button>
+        <el-button @click="handleExport">
+          <el-icon><Download /></el-icon>
+          导出数据
+        </el-button>
+      </div>
+      
+      <div class="right">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索任务名称、资产编号..."
+          style="width: 240px; margin-right: 10px;"
+          @keyup.enter="handleSearch"
+        >
+          <template #append>
+            <el-button @click="handleSearch">
+              <el-icon><Search /></el-icon>
+            </el-button>
+          </template>
+        </el-input>
+        
+        <el-button @click="showFilters = !showFilters">
+          <el-icon><Filter /></el-icon>
+          筛选
+        </el-button>
+      </div>
+    </div>
 
-      <!-- 盘点列表 -->
-      <el-table :data="inventoryList" v-loading="loading">
-        <el-table-column prop="name" label="盘点名称" width="200" />
-        <el-table-column prop="department.name" label="部门" width="150">
+    <!-- 筛选条件 -->
+    <div v-if="showFilters" class="filters">
+      <el-form :model="filterForm" inline>
+        <el-form-item label="状态：">
+          <el-select v-model="filterForm.status" placeholder="选择状态" clearable>
+            <el-option label="草稿" value="draft" />
+            <el-option label="已激活" value="active" />
+            <el-option label="进行中" value="in_progress" />
+            <el-option label="已暂停" value="paused" />
+            <el-option label="已完成" value="completed" />
+            <el-option label="已取消" value="cancelled" />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="任务类型：">
+          <el-select v-model="filterForm.task_type" placeholder="选择类型" clearable>
+            <el-option label="定期盘点" value="periodic" />
+            <el-option label="随机抽查" value="random" />
+            <el-option label="全面盘点" value="full" />
+            <el-option label="现场抽查" value="spot" />
+            <el-option label="循环盘点" value="cycle" />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="负责人：">
+          <el-select
+            v-model="filterForm.assigned_to"
+            placeholder="选择负责人"
+            clearable
+            filterable
+          >
+            <el-option
+              v-for="user in users"
+              :key="user.id"
+              :label="user.name"
+              :value="user.id"
+            />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="日期范围：">
+          <el-date-picker
+            v-model="filterForm.dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+          />
+        </el-form-item>
+        
+        <el-form-item>
+          <el-button type="primary" @click="handleFilter">查询</el-button>
+          <el-button @click="handleReset">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </div>
+
+    <!-- 统计面板 -->
+    <div class="statistics-panel">
+      <el-row :gutter="20">
+        <el-col :span="6">
+          <div class="stat-card">
+            <div class="stat-value">{{ statistics.total || 0 }}</div>
+            <div class="stat-label">总盘点任务</div>
+          </div>
+        </el-col>
+        <el-col :span="6">
+          <div class="stat-card">
+            <div class="stat-value">{{ statistics.active || 0 }}</div>
+            <div class="stat-label">进行中任务</div>
+          </div>
+        </el-col>
+        <el-col :span="6">
+          <div class="stat-card">
+            <div class="stat-value">{{ statistics.overdue || 0 }}</div>
+            <div class="stat-label">逾期任务</div>
+          </div>
+        </el-col>
+        <el-col :span="6">
+          <div class="stat-card">
+            <div class="stat-value">{{ statistics.pending_reviews || 0 }}</div>
+            <div class="stat-label">待审核记录</div>
+          </div>
+        </el-col>
+      </el-row>
+    </div>
+
+    <!-- 任务列表 -->
+    <div class="tasks-section">
+      <div class="section-header">
+        <h3>盘点任务</h3>
+        <el-button type="primary" text @click="activeTab = 'tasks'">查看全部</el-button>
+      </div>
+      
+      <el-table
+        :data="taskList"
+        v-loading="loading"
+        stripe
+        style="width: 100%"
+        @row-click="handleTaskClick"
+      >
+        <el-table-column prop="task_number" label="任务编号" width="140" />
+        <el-table-column prop="task_name" label="任务名称" min-width="160" />
+        <el-table-column prop="task_type_label" label="任务类型" width="100" />
+        <el-table-column label="日期范围" width="180">
           <template #default="{ row }">
-            {{ row.department ? row.department.name : '-' }}
+            <div>{{ row.start_date }} 至 {{ row.end_date }}</div>
+            <div v-if="row.is_overdue" style="color: #f56c6c; font-size: 12px;">
+              <el-icon><Warning /></el-icon> 已逾期
+            </div>
+            <div v-else-if="row.is_due_today" style="color: #e6a23c; font-size: 12px;">
+              <el-icon><Clock /></el-icon> 今日到期
+            </div>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column label="资产数量" width="120">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">
-              {{ getStatusText(row.status) }}
+            {{ row.completed_assets }}/{{ row.total_assets }}
+          </template>
+        </el-table-column>
+        <el-table-column label="进度" width="180">
+          <template #default="{ row }">
+            <el-progress 
+              :percentage="row.completion_rate" 
+              :status="getProgressStatus(row.completion_rate)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="status_label" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusTagType(row.status)">
+              {{ row.status_label }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180">
-          <template #default="{ row }">
-            {{ formatDate(row.created_at) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="completed_at" label="完成时间" width="180">
-          <template #default="{ row }">
-            {{ row.completed_at ? formatDate(row.completed_at) : '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="进度" width="120">
-          <template #default="{ row }">
-            <el-progress :percentage="getProgress(row)" :color="getProgressColor(row)" />
-          </template>
-        </el-table-column>
+        <el-table-column prop="assignee.name" label="负责人" width="120" />
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.status === 'in_progress'" type="primary" link @click="handleScan(row)">扫码盘点</el-button>
-            <el-button type="primary" link @click="handleView(row)">查看详情</el-button>
-            <el-button v-if="row.status === 'in_progress'" type="success" link @click="handleComplete(row)">完成盘点</el-button>
+            <el-button size="small" @click.stop="handleViewTask(row)">详情</el-button>
+            
+            <template v-if="row.status === 'draft'">
+              <el-button size="small" type="primary" @click.stop="handleEditTask(row)">
+                编辑
+              </el-button>
+              <el-button size="small" @click.stop="handleStartTask(row)">
+                开始
+              </el-button>
+            </template>
+            
+            <template v-if="row.status === 'in_progress'">
+              <el-button size="small" type="success" @click.stop="handleCompleteTask(row)">
+                完成
+              </el-button>
+              <el-button size="small" @click.stop="handleTaskRecords(row)">
+                盘点
+              </el-button>
+            </template>
           </template>
         </el-table-column>
       </el-table>
-    </el-card>
 
-    <!-- 开始盘点对话框 -->
-    <el-dialog v-model="startDialogVisible" title="开始盘点" width="600px">
-      <el-form :model="startForm" :rules="startRules" ref="startFormRef" label-width="100px">
-        <el-form-item label="盘点名称" prop="name">
-          <el-input v-model="startForm.name" placeholder="例如: 2024年第一季度盘点" />
-        </el-form-item>
-        <el-form-item label="盘点部门" prop="department_id">
-          <el-tree-select
-            v-model="startForm.department_id"
-            :data="departmentTree"
-            :props="{ label: 'name', value: 'id' }"
-            placeholder="选择盘点部门"
-            clearable
-          />
-        </el-form-item>
-        <el-form-item label="备注" prop="description">
-          <el-input v-model="startForm.description" type="textarea" :rows="3" placeholder="盘点说明" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="startDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleStartSubmit">确定</el-button>
-      </template>
-    </el-dialog>
+      <!-- 任务分页 -->
+      <div class="pagination">
+        <el-pagination
+          v-model:current-page="taskPagination.current"
+          v-model:page-size="taskPagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="taskPagination.total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleTaskSizeChange"
+          @current-change="handleTaskCurrentChange"
+        />
+      </div>
+    </div>
 
-    <!-- 扫码盘点对话框 -->
-    <el-dialog v-model="scanDialogVisible" title="扫码盘点" width="800px" fullscreen>
-      <div class="scan-container">
-        <!-- 扫码区域 -->
-        <div class="scan-area">
-          <el-input
-            v-model="scanCode"
-            placeholder="扫描资产二维码或输入资产标签"
-            size="large"
-            @keyup.enter="handleScanSubmit"
-            ref="scanInputRef"
-            autofocus
-          >
-            <template #append>
-              <el-button :icon="Camera" @click="handleOpenCamera">打开摄像头</el-button>
-            </template>
-          </el-input>
-
-          <!-- 摄像头区域 -->
-          <div v-if="cameraOpen" class="camera-area">
-            <video ref="videoRef" autoplay playsinline></video>
-            <canvas ref="canvasRef" style="display: none;"></canvas>
-            <el-button type="danger" @click="handleCloseCamera" style="margin-top: 10px;">关闭摄像头</el-button>
-          </div>
-        </div>
-
-        <!-- 盘点进度 -->
-        <div class="scan-progress">
-          <el-card>
+    <!-- 今日待办 -->
+    <div class="todays-tasks" v-if="todaysTasks.length > 0">
+      <div class="section-header">
+        <h3>今日待办</h3>
+        <el-button type="primary" text @click="loadTodaysTasks">刷新</el-button>
+      </div>
+      
+      <el-row :gutter="20">
+        <el-col :span="8" v-for="task in todaysTasks" :key="task.id">
+          <el-card class="task-card">
             <template #header>
-              <div class="progress-header">
-                <span>盘点进度</span>
-                <el-button size="small" @click="loadProgress">刷新</el-button>
+              <div class="task-card-header">
+                <span>{{ task.task_name }}</span>
+                <el-tag :type="getStatusTagType(task.status)" size="small">
+                  {{ task.status_label }}
+                </el-tag>
               </div>
             </template>
-            <el-row :gutter="20">
-              <el-col :span="6">
-                <div class="stat-item">
-                  <div class="stat-value">{{ progress.total }}</div>
-                  <div class="stat-label">已扫描</div>
-                </div>
-              </el-col>
-              <el-col :span="6">
-                <div class="stat-item">
-                  <div class="stat-value" style="color: #67c23a;">{{ progress.found }}</div>
-                  <div class="stat-label">正常</div>
-                </div>
-              </el-col>
-              <el-col :span="6">
-                <div class="stat-item">
-                  <div class="stat-value" style="color: #f56c6c;">{{ progress.lost + progress.damaged }}</div>
-                  <div class="stat-label">异常</div>
-                </div>
-              </el-col>
-              <el-col :span="6">
-                <div class="stat-item">
-                  <div class="stat-value">{{ progress.progress }}%</div>
-                  <div class="stat-label">进度</div>
-                </div>
-              </el-col>
-            </el-row>
+            
+            <div class="task-card-content">
+              <div class="task-info">
+                <div><el-icon><Calendar /></el-icon> {{ task.start_date }} ~ {{ task.end_date }}</div>
+                <div><el-icon><User /></el-icon> {{ task.assignee?.name || '未分配' }}</div>
+                <div><el-icon><DataBoard /></el-icon> {{ task.completed_assets }}/{{ task.total_assets }} 资产</div>
+              </div>
+              
+              <el-progress 
+                :percentage="task.completion_rate" 
+                :status="getProgressStatus(task.completion_rate)"
+              />
+              
+              <div class="task-actions">
+                <el-button size="small" type="primary" @click="handleTaskRecords(task)">
+                  开始盘点
+                </el-button>
+                <el-button size="small" @click="handleViewTask(task)">
+                  查看详情
+                </el-button>
+              </div>
+            </div>
           </el-card>
-        </div>
+        </el-col>
+      </el-row>
+    </div>
 
-        <!-- 最近扫描记录 -->
-        <div class="scan-history">
-          <el-card>
-            <template #header>
-              <span>最近扫描记录</span>
-            </template>
-            <el-table :data="scannedAssets" max-height="300">
-              <el-table-column prop="asset_tag" label="资产标签" width="120" />
-              <el-table-column prop="asset.name" label="资产名称" min-width="150" />
-              <el-table-column prop="actual_location" label="实际位置" width="150" />
-              <el-table-column prop="status" label="状态" width="100">
-                <template #default="{ row }">
-                  <el-tag :type="getScanStatusType(row.status)">
-                    {{ getScanStatusText(row.status) }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="scanned_at" label="扫描时间" width="180">
-                <template #default="{ row }">
-                  {{ formatDate(row.scanned_at) }}
-                </template>
-              </el-table-column>
-            </el-table>
-          </el-card>
-        </div>
-      </div>
+    <!-- 盘点记录标签页 -->
+    <div class="tabs-section">
+      <el-tabs v-model="activeTab" @tab-click="handleTabChange">
+        <el-tab-pane label="盘点记录" name="records">
+          <el-table
+            :data="recordList"
+            v-loading="loadingRecords"
+            stripe
+            style="width: 100%"
+            @row-click="handleRecordClick"
+          >
+            <el-table-column prop="inventory_number" label="盘点编号" width="140" />
+            <el-table-column label="资产信息" min-width="180">
+              <template #default="{ row }">
+                <div>
+                  <div>{{ row.asset?.asset_tag }} - {{ row.asset?.name }}</div>
+                  <div style="font-size: 12px; color: #666;">{{ row.asset?.brand }} {{ row.asset?.model }}</div>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="inventory_type_label" label="盘点类型" width="100" />
+            <el-table-column prop="inventory_date" label="盘点日期" width="120" />
+            <el-table-column prop="physical_status_label" label="实物状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="getPhysicalStatusTagType(row.physical_status)" size="small">
+                  {{ row.physical_status_label }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="status_match_label" label="状态匹配" width="120">
+              <template #default="{ row }">
+                <el-tag :type="getMatchStatusTagType(row.status_match)" size="small">
+                  {{ row.status_match_label }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="condition_description" label="状况" width="80" />
+            <el-table-column prop="review_status_label" label="审核状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="getReviewStatusTagType(row.review_status)" size="small">
+                  {{ row.review_status_label }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="user.name" label="盘点员" width="120" />
+            <el-table-column label="操作" width="150" fixed="right">
+              <template #default="{ row }">
+                <el-button size="small" @click.stop="handleViewRecord(row)">详情</el-button>
+                <el-button 
+                  v-if="row.review_status === 'pending' && canReview" 
+                  size="small" 
+                  type="success"
+                  @click.stop="handleReviewRecord(row)"
+                >
+                  审核
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <!-- 记录分页 -->
+          <div class="pagination">
+            <el-pagination
+              v-model:current-page="recordPagination.current"
+              v-model:page-size="recordPagination.size"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="recordPagination.total"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="handleRecordSizeChange"
+              @current-change="handleRecordCurrentChange"
+            />
+          </div>
+        </el-tab-pane>
+        
+        <el-tab-pane label="待审核" name="pending_reviews">
+          <div v-if="pendingReviews.length === 0" class="empty-state">
+            <el-empty description="暂无待审核记录" />
+          </div>
+          
+          <div v-else class="review-list">
+            <el-card v-for="record in pendingReviews" :key="record.id" class="review-card">
+              <template #header>
+                <div class="review-header">
+                  <div class="review-title">
+                    <span>{{ record.asset?.asset_tag }} - {{ record.asset?.name }}</span>
+                    <el-tag :type="getPhysicalStatusTagType(record.physical_status)" size="small">
+                      {{ record.physical_status_label }}
+                    </el-tag>
+                  </div>
+                  <div class="review-meta">
+                    <span>{{ record.inventory_number }}</span>
+                    <span>盘点员: {{ record.user?.name }}</span>
+                    <span>{{ record.inventory_date }}</span>
+                  </div>
+                </div>
+              </template>
+              
+              <div class="review-content">
+                <div class="review-info">
+                  <div>状态匹配: <el-tag :type="getMatchStatusTagType(record.status_match)" size="small">
+                    {{ record.status_match_label }}
+                  </el-tag></div>
+                  <div>资产状况: {{ record.condition_description }}</div>
+                  <div v-if="record.has_issues" style="color: #f56c6c;">
+                    <el-icon><Warning /></el-icon> 异常: {{ record.issue_description }}
+                  </div>
+                </div>
+                
+                <div class="review-actions">
+                  <el-button type="success" size="small" @click="handleApproveReview(record)">
+                    <el-icon><Check /></el-icon> 通过
+                  </el-button>
+                  <el-button type="danger" size="small" @click="handleRejectReview(record)">
+                    <el-icon><Close /></el-icon> 拒绝
+                  </el-button>
+                  <el-button size="small" @click="handleViewRecord(record)">查看详情</el-button>
+                </div>
+              </div>
+            </el-card>
+          </div>
+        </el-tab-pane>
+        
+        <el-tab-pane label="异常记录" name="issue_records">
+          <div v-if="issueRecords.length === 0" class="empty-state">
+            <el-empty description="暂无异常记录" />
+          </div>
+          
+          <div v-else class="issue-list">
+            <el-card v-for="record in issueRecords" :key="record.id" class="issue-card">
+              <div class="issue-card-header">
+                <div class="issue-title">
+                  <span>{{ record.asset?.asset_tag }} - {{ record.asset?.name }}</span>
+                  <el-tag type="danger" size="small">异常</el-tag>
+                </div>
+                <div class="issue-meta">
+                  <span>{{ record.inventory_number }}</span>
+                  <span>{{ record.inventory_date }}</span>
+                  <span>盘点员: {{ record.user?.name }}</span>
+                </div>
+              </div>
+              
+              <div class="issue-content">
+                <div class="issue-details">
+                  <div><strong>问题描述:</strong> {{ record.issue_description }}</div>
+                  <div><strong>实物状态:</strong> {{ record.physical_status_label }}</div>
+                  <div><strong>状态匹配:</strong> {{ record.status_match_label }}</div>
+                  <div v-if="record.damage_description"><strong>损坏描述:</strong> {{ record.damage_description }}</div>
+                  <div v-if="record.estimated_repair_cost"><strong>预估维修成本:</strong> {{ record.estimated_repair_cost | currency }}</div>
+                </div>
+                
+                <div class="issue-actions">
+                  <el-button type="warning" size="small" @click="handleFollowUpIssue(record)">
+                    <el-icon><Link /></el-icon> 跟进
+                  </el-button>
+                  <el-button size="small" @click="handleViewRecord(record)">查看详情</el-button>
+                </div>
+              </div>
+            </el-card>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
+
+    <!-- 新建/编辑任务对话框 -->
+    <el-dialog
+      v-model="taskDialogVisible"
+      :title="taskDialogTitle"
+      width="900px"
+      @close="handleTaskDialogClose"
+    >
+      <InventoryTaskForm
+        v-if="taskDialogVisible"
+        :task-data="currentTask"
+        :mode="taskDialogMode"
+        @submit="handleTaskFormSubmit"
+        @cancel="taskDialogVisible = false"
+      />
     </el-dialog>
 
-    <!-- 扫描结果对话框 -->
-    <el-dialog v-model="resultDialogVisible" title="扫描结果" width="600px">
-      <el-descriptions v-if="scannedAsset" :column="2" border>
-        <el-descriptions-item label="资产标签">{{ scannedAsset.asset_tag }}</el-descriptions-item>
-        <el-descriptions-item label="资产名称">{{ scannedAsset.name }}</el-descriptions-item>
-        <el-descriptions-item label="分类">{{ scannedAsset.category?.name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="使用人">{{ scannedAsset.user?.name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="预期位置">{{ expectedLocation }}</el-descriptions-item>
-        <el-descriptions-item label="当前状态">
-          <el-tag>{{ getStatusText(scannedAsset.status) }}</el-tag>
-        </el-descriptions-item>
-      </el-descriptions>
+    <!-- 任务详情对话框 -->
+    <el-dialog
+      v-model="taskDetailVisible"
+      title="盘点任务详情"
+      width="1000px"
+    >
+      <InventoryTaskDetail
+        v-if="taskDetailVisible"
+        :task="currentTask"
+        @close="taskDetailVisible = false"
+      />
+    </el-dialog>
 
-      <el-form :model="scanForm" :rules="scanRules" ref="scanFormRef" label-width="100px" style="margin-top: 20px;">
-        <el-form-item label="盘点状态" prop="status">
-          <el-radio-group v-model="scanForm.status">
-            <el-radio label="found">正常</el-radio>
-            <el-radio label="not_found">未找到</el-radio>
-            <el-radio label="lost">丢失</el-radio>
-            <el-radio label="damaged">损坏</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="实际位置" prop="location">
-          <el-input v-model="scanForm.location" placeholder="输入实际位置" />
-        </el-form-item>
-        <el-form-item label="备注" prop="notes">
-          <el-input v-model="scanForm.notes" type="textarea" :rows="3" placeholder="备注信息" />
-        </el-form-item>
-      </el-form>
+    <!-- 盘点记录对话框 -->
+    <el-dialog
+      v-model="recordDialogVisible"
+      title="盘点记录"
+      width="900px"
+    >
+      <InventoryRecordForm
+        v-if="recordDialogVisible"
+        :task-id="currentTaskId"
+        @submit="handleRecordFormSubmit"
+        @cancel="recordDialogVisible = false"
+      />
+    </el-dialog>
 
-      <template #footer>
-        <el-button @click="resultDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleConfirmScan">确认</el-button>
-      </template>
+    <!-- 记录详情对话框 -->
+    <el-dialog
+      v-model="recordDetailVisible"
+      title="盘点记录详情"
+      width="1000px"
+    >
+      <InventoryRecordDetail
+        v-if="recordDetailVisible"
+        :record="currentRecord"
+        @close="recordDetailVisible = false"
+      />
+    </el-dialog>
+
+    <!-- 审核对话框 -->
+    <el-dialog
+      v-model="reviewDialogVisible"
+      title="审核盘点记录"
+      width="600px"
+    >
+      <ReviewForm
+        v-if="reviewDialogVisible"
+        :record="currentRecord"
+        @approve="handleReviewSubmit"
+        @cancel="reviewDialogVisible = false"
+      />
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick } from 'vue'
-import { Camera } from '@element-plus/icons-vue'
-import { getInventories, startInventory, scanAsset, getInventoryProgress, completeInventory } from '@/api/inventory'
-import { getDepartmentTree } from '@/api/department'
-import { scanAsset as scanAssetInfo } from '@/api/asset'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import dayjs from 'dayjs'
+import { 
+  Plus, DocumentChecked, Camera, Download, Search, Filter,
+  Warning, Clock, Calendar, User, DataBoard, Check, Close, Link
+} from '@element-plus/icons-vue'
 
+import InventoryTaskForm from './components/InventoryTaskForm.vue'
+import InventoryTaskDetail from './components/InventoryTaskDetail.vue'
+import InventoryRecordForm from './components/InventoryRecordForm.vue'
+import InventoryRecordDetail from './components/InventoryRecordDetail.vue'
+import ReviewForm from './components/ReviewForm.vue'
+import { inventoryApi } from '@/api/export'
+
+// 响应式数据
+const searchKeyword = ref('')
+const showFilters = ref(false)
 const loading = ref(false)
-const inventoryList = ref([])
-const departmentTree = ref([])
-const currentInventory = ref(null)
+const loadingRecords = ref(false)
+const taskDialogVisible = ref(false)
+const taskDetailVisible = ref(false)
+const recordDialogVisible = ref(false)
+const recordDetailVisible = ref(false)
+const reviewDialogVisible = ref(false)
+const activeTab = ref('records')
 
-const startDialogVisible = ref(false)
-const scanDialogVisible = ref(false)
-const resultDialogVisible = ref(false)
+const taskDialogMode = ref('create')
+const taskDialogTitle = ref('')
+const currentTask = ref(null)
+const currentTaskId = ref(null)
+const currentRecord = ref(null)
 
-const startFormRef = ref(null)
-const scanFormRef = ref(null)
-const scanInputRef = ref(null)
+const users = ref([])
+const taskList = ref([])
+const recordList = ref([])
+const pendingReviews = ref([])
+const issueRecords = ref([])
+const todaysTasks = ref([])
 
-const videoRef = ref(null)
-const canvasRef = ref(null)
-const cameraOpen = ref(false)
-const scanCode = ref('')
-const scannedAsset = ref(null)
-const expectedLocation = ref('')
-
-const startForm = reactive({
-  name: '',
-  department_id: null,
-  description: ''
+const filterForm = reactive({
+  status: '',
+  task_type: '',
+  assigned_to: '',
+  dateRange: []
 })
 
-const scanForm = reactive({
-  status: 'found',
-  location: '',
-  notes: ''
-})
-
-const progress = ref({
+const statistics = reactive({
   total: 0,
-  found: 0,
-  lost: 0,
-  damaged: 0,
-  not_found: 0,
-  progress: 0
+  active: 0,
+  overdue: 0,
+  pending_reviews: 0
 })
 
-const scannedAssets = ref([])
+const taskPagination = reactive({
+  current: 1,
+  size: 10,
+  total: 0
+})
 
-const startRules = {
-  name: [{ required: true, message: '请输入盘点名称', trigger: 'blur' }]
-}
+const recordPagination = reactive({
+  current: 1,
+  size: 20,
+  total: 0
+})
 
-const scanRules = {
-  status: [{ required: true, message: '请选择盘点状态', trigger: 'change' }]
-}
+// 计算属性
+const taskDialogTitle = computed(() => {
+  return taskDialogMode.value === 'create' ? '新建盘点任务' : '编辑盘点任务'
+})
 
-const getStatusType = (status) => {
-  const map = {
-    pending: 'info',
-    in_progress: 'warning',
-    completed: 'success'
-  }
-  return map[status] || 'info'
-}
+const canReview = computed(() => {
+  // 这里可以根据用户角色判断审核权限
+  return true // 临时返回true
+})
 
-const getStatusText = (status) => {
-  const map = {
-    pending: '未开始',
-    in_progress: '进行中',
-    completed: '已完成'
-  }
-  return map[status] || status
-}
+// 生命周期
+onMounted(() => {
+  loadStatistics()
+  loadTasks()
+  loadRecords()
+  loadPendingReviews()
+  loadIssueRecords()
+  loadTodaysTasks()
+  loadUsers()
+})
 
-const getScanStatusType = (status) => {
-  const map = {
-    found: 'success',
-    not_found: 'warning',
-    lost: 'danger',
-    damaged: 'danger'
-  }
-  return map[status] || 'info'
-}
-
-const getScanStatusText = (status) => {
-  const map = {
-    found: '正常',
-    not_found: '未找到',
-    lost: '丢失',
-    damaged: '损坏'
-  }
-  return map[status] || status
-}
-
-const getProgress = (inventory) => {
-  if (!inventory.items || inventory.items.length === 0) return 0
-  const found = inventory.items.filter(item => item.status === 'found').length
-  return Math.round((found / inventory.items.length) * 100)
-}
-
-const getProgressColor = (inventory) => {
-  const progress = getProgress(inventory)
-  if (progress === 100) return '#67c23a'
-  if (progress >= 50) return '#409eff'
-  return '#e6a23c'
-}
-
-const formatDate = (date) => {
-  return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
-}
-
-const loadInventories = async () => {
-  loading.value = true
+// 方法
+const loadStatistics = async () => {
   try {
-    const response = await getInventories()
-    inventoryList.value = response.data.data
+    // TODO: 调用统计API
+    // 暂时使用模拟数据
+    statistics.total = 15
+    statistics.active = 3
+    statistics.overdue = 2
+    statistics.pending_reviews = 5
   } catch (error) {
-    console.error('Failed to load inventories:', error)
+    console.error('加载统计失败:', error)
+  }
+}
+
+const loadTasks = async () => {
+  try {
+    loading.value = true
+    
+    const params = {
+      page: taskPagination.current,
+      per_page: taskPagination.size,
+      search: searchKeyword.value
+    }
+    
+    if (filterForm.status) params.status = filterForm.status
+    if (filterForm.task_type) params.task_type = filterForm.task_type
+    if (filterForm.assigned_to) params.assigned_to = filterForm.assigned_to
+    if (filterForm.dateRange?.length === 2) {
+      params.start_date = filterForm.dateRange[0]
+      params.end_date = filterForm.dateRange[1]
+    }
+    
+    const response = await inventoryApi.getTasks(params)
+    
+    if (response.success) {
+      taskList.value = response.data.data
+      taskPagination.total = response.data.total
+    } else {
+      ElMessage.error(response.message)
+    }
+  } catch (error) {
+    ElMessage.error('加载任务列表失败')
+    console.error(error)
   } finally {
     loading.value = false
   }
 }
 
-const handleStartInventory = () => {
-  Object.assign(startForm, {
-    name: '',
-    department_id: null,
-    description: ''
-  })
-  startDialogVisible.value = true
-}
-
-const handleStartSubmit = async () => {
-  if (!startFormRef.value) return
-
-  await startFormRef.value.validate(async (valid) => {
-    if (valid) {
-      try {
-        await startInventory(startForm)
-        ElMessage.success('盘点创建成功')
-        startDialogVisible.value = false
-        await loadInventories()
-      } catch (error) {
-        console.error('Failed to start inventory:', error)
-      }
-    }
-  })
-}
-
-const handleScan = (inventory) => {
-  currentInventory.value = inventory
-  scanCode.value = ''
-  scannedAssets.value = []
-  scanDialogVisible.value = true
-  loadProgress()
-
-  nextTick(() => {
-    if (scanInputRef.value) {
-      scanInputRef.value.focus()
-    }
-  })
-}
-
-const handleScanSubmit = async () => {
-  if (!scanCode.value) {
-    ElMessage.warning('请扫描或输入资产标签')
-    return
-  }
-
+const loadRecords = async () => {
   try {
-    // 获取资产信息
-    const response = await scanAssetInfo({ code: scanCode.value })
+    loadingRecords.value = true
+    
+    const params = {
+      page: recordPagination.current,
+      per_page: recordPagination.size
+    }
+    
+    const response = await inventoryApi.getRecords(params)
+    
     if (response.success) {
-      scannedAsset.value = response.data
-      expectedLocation.value = response.data.location || '未设置'
-
-      // 预填充实际位置
-      scanForm.location = expectedLocation.value
-
-      resultDialogVisible.value = true
+      recordList.value = response.data.data
+      recordPagination.total = response.data.total
+    } else {
+      ElMessage.error(response.message)
     }
   } catch (error) {
-    ElMessage.error('未找到该资产')
+    ElMessage.error('加载盘点记录失败')
+    console.error(error)
+  } finally {
+    loadingRecords.value = false
   }
 }
 
-const handleConfirmScan = async () => {
-  if (!scanFormRef.value) return
-
-  await scanFormRef.value.validate(async (valid) => {
-    if (valid) {
-      try {
-        await scanAsset(currentInventory.value.id, {
-          asset_tag: scanCode.value,
-          ...scanForm
-        })
-
-        ElMessage.success('资产盘点成功')
-
-        // 添加到已扫描列表
-        scannedAssets.value.unshift({
-          asset: scannedAsset.value,
-          asset_tag: scannedAsset.value.asset_tag,
-          asset_name: scannedAsset.value.name,
-          actual_location: scanForm.location,
-          status: scanForm.status,
-          scanned_at: new Date()
-        })
-
-        resultDialogVisible.value = false
-        scanCode.value = ''
-        await loadProgress()
-
-        nextTick(() => {
-          if (scanInputRef.value) {
-            scanInputRef.value.focus()
-          }
-        })
-      } catch (error) {
-        console.error('Failed to scan asset:', error)
-      }
+const loadPendingReviews = async () => {
+  try {
+    const response = await inventoryApi.getPendingReviews()
+    
+    if (response.success) {
+      pendingReviews.value = response.data.data
     }
+  } catch (error) {
+    console.error('加载待审核记录失败:', error)
+  }
+}
+
+const loadIssueRecords = async () => {
+  try {
+    const response = await inventoryApi.getIssueRecords()
+    
+    if (response.success) {
+      issueRecords.value = response.data.data
+    }
+  } catch (error) {
+    console.error('加载异常记录失败:', error)
+  }
+}
+
+const loadTodaysTasks = async () => {
+  try {
+    const response = await inventoryApi.getTodaysTasks()
+    
+    if (response.success) {
+      todaysTasks.value = response.data.data
+    }
+  } catch (error) {
+    console.error('加载今日待办失败:', error)
+  }
+}
+
+const loadUsers = async () => {
+  try {
+    // TODO: 调用用户列表API
+    // 暂时使用模拟数据
+    users.value = [
+      { id: 1, name: '张三' },
+      { id: 2, name: '李四' },
+      { id: 3, name: '王五' }
+    ]
+  } catch (error) {
+    console.error('加载用户列表失败:', error)
+  }
+}
+
+const handleSearch = () => {
+  taskPagination.current = 1
+  loadTasks()
+}
+
+const handleFilter = () => {
+  taskPagination.current = 1
+  loadTasks()
+}
+
+const handleReset = () => {
+  Object.keys(filterForm).forEach(key => {
+    filterForm[key] = Array.isArray(filterForm[key]) ? [] : ''
   })
+  searchKeyword.value = ''
+  taskPagination.current = 1
+  loadTasks()
 }
 
-const loadProgress = async () => {
-  try {
-    const response = await getInventoryProgress(currentInventory.value.id)
-    progress.value = response.data
-  } catch (error) {
-    console.error('Failed to load progress:', error)
+const handleTaskSizeChange = (size) => {
+  taskPagination.size = size
+  taskPagination.current = 1
+  loadTasks()
+}
+
+const handleTaskCurrentChange = (page) => {
+  taskPagination.current = page
+  loadTasks()
+}
+
+const handleRecordSizeChange = (size) => {
+  recordPagination.size = size
+  recordPagination.current = 1
+  loadRecords()
+}
+
+const handleRecordCurrentChange = (page) => {
+  recordPagination.current = page
+  loadRecords()
+}
+
+const handleTabChange = (tab) => {
+  if (tab.paneName === 'pending_reviews') {
+    loadPendingReviews()
+  } else if (tab.paneName === 'issue_records') {
+    loadIssueRecords()
   }
 }
 
-const handleComplete = async (inventory) => {
+const handleCreateTask = () => {
+  taskDialogMode.value = 'create'
+  currentTask.value = null
+  taskDialogVisible.value = true
+}
+
+const handleEditTask = (task) => {
+  taskDialogMode.value = 'edit'
+  currentTask.value = { ...task }
+  taskDialogVisible.value = true
+}
+
+const handleViewTask = (task) => {
+  currentTask.value = task
+  taskDetailVisible.value = true
+}
+
+const handleTaskClick = (task) => {
+  // 可以在这里实现点击行跳转到详情
+  console.log('点击任务:', task)
+}
+
+const handleStartTask = async (task) => {
   try {
-    await ElMessageBox.confirm(`确定要完成盘点"${inventory.name}"吗?`, '提示', {
+    const response = await inventoryApi.startTask(task.id)
+    
+    if (response.success) {
+      ElMessage.success('任务开始成功')
+      loadTasks()
+      loadTodaysTasks()
+    } else {
+      ElMessage.error(response.message)
+    }
+  } catch (error) {
+    ElMessage.error('开始任务失败')
+    console.error(error)
+  }
+}
+
+const handleCompleteTask = async (task) => {
+  try {
+    await ElMessageBox.confirm('确定要完成此盘点任务吗？', '确认完成', {
       type: 'warning'
     })
-
-    await completeInventory(inventory.id)
-    ElMessage.success('盘点已完成')
-    await loadInventories()
+    
+    const response = await inventoryApi.completeTask(task.id)
+    
+    if (response.success) {
+      ElMessage.success('任务完成成功')
+      loadTasks()
+      loadTodaysTasks()
+    } else {
+      ElMessage.error(response.message)
+    }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('Failed to complete inventory:', error)
+      ElMessage.error('完成任务失败')
     }
   }
 }
 
-const handleView = (inventory) => {
-  // 查看盘点详情
-  console.log('View inventory:', inventory)
+const handleTaskRecords = (task) => {
+  currentTaskId.value = task.id
+  recordDialogVisible.value = true
 }
 
-// 摄像头扫码功能(简化版,实际需要集成二维码扫描库)
-const handleOpenCamera = () => {
-  cameraOpen.value = true
-  ElMessage.info('摄像头扫码功能需要集成二维码扫描库')
+const handleQuickInventory = () => {
+  currentTaskId.value = null
+  recordDialogVisible.value = true
 }
 
-const handleCloseCamera = () => {
-  cameraOpen.value = false
-  if (videoRef.value && videoRef.value.srcObject) {
-    videoRef.value.srcObject.getTracks().forEach(track => track.stop())
-  }
+const handleScanQR = () => {
+  ElMessage.info('二维码扫描功能正在开发中')
+  // TODO: 实现二维码扫描功能
 }
 
-onMounted(async () => {
-  await loadInventories()
+const handleExport = async () => {
   try {
-    const response = await getDepartmentTree()
-    departmentTree.value = response.data
+    const response = await inventoryApi.export()
+    
+    if (response.success) {
+      ElMessage.success('导出数据准备完成')
+    } else {
+      ElMessage.error(response.message)
+    }
   } catch (error) {
-    console.error('Failed to load department tree:', error)
+    ElMessage.error('导出失败')
+    console.error(error)
   }
-})
+}
+
+const handleTaskFormSubmit = async (formData) => {
+  try {
+    let response
+    
+    if (taskDialogMode.value === 'create') {
+      response = await inventoryApi.createTask(formData)
+    } else {
+      response = await inventoryApi.updateTask(currentTask.value.id, formData)
+    }
+    
+    if (response.success) {
+      ElMessage.success(taskDialogMode.value === 'create' ? '创建成功' : '更新成功')
+      taskDialogVisible.value = false
+      loadTasks()
+      loadStatistics()
+    } else {
+      ElMessage.error(response.message)
+    }
+  } catch (error) {
+    ElMessage.error('操作失败')
+    console.error(error)
+  }
+}
+
+const handleTaskDialogClose = () => {
+  currentTask.value = null
+}
+
+const handleRecordFormSubmit = async (formData) => {
+  try {
+    const response = await inventoryApi.createRecord(formData)
+    
+    if (response.success) {
+      ElMessage.success('盘点记录创建成功')
+      recordDialogVisible.value = false
+      loadRecords()
+      loadPendingReviews()
+      loadIssueRecords()
+      
+      // 如果有关联任务，重新加载任务进度
+      if (currentTaskId.value) {
+        loadTasks()
+      }
+    } else {
+      ElMessage.error(response.message)
+    }
+  } catch (error) {
+    ElMessage.error('创建盘点记录失败')
+    console.error(error)
+  }
+}
+
+const handleViewRecord = (record) => {
+  currentRecord.value = record
+  recordDetailVisible.value = true
+}
+
+const handleRecordClick = (record) => {
+  console.log('点击记录:', record)
+}
+
+const handleReviewRecord = (record) => {
+  currentRecord.value = record
+  reviewDialogVisible.value = true
+}
+
+const handleApproveReview = (record) => {
+  currentRecord.value = record
+  reviewDialogVisible.value = true
+}
+
+const handleRejectReview = (record) => {
+  currentRecord.value = record
+  reviewDialogVisible.value = true
+}
+
+const handleFollowUpIssue = (record) => {
+  ElMessage.info('跟进功能正在开发中')
+  // TODO: 实现跟进功能
+}
+
+const handleReviewSubmit = async (reviewData) => {
+  try {
+    const response = await inventoryApi.reviewRecord(currentRecord.value.id, reviewData)
+    
+    if (response.success) {
+      ElMessage.success('审核成功')
+      reviewDialogVisible.value = false
+      loadRecords()
+      loadPendingReviews()
+    } else {
+      ElMessage.error(response.message)
+    }
+  } catch (error) {
+    ElMessage.error('审核失败')
+    console.error(error)
+  }
+}
+
+// 状态标签类型
+const getStatusTagType = (status) => {
+  const types = {
+    draft: 'info',
+    active: 'primary',
+    in_progress: 'success',
+    paused: 'warning',
+    completed: 'success',
+    cancelled: 'danger'
+  }
+  return types[status] || 'info'
+}
+
+const getPhysicalStatusTagType = (status) => {
+  const types = {
+    found: 'success',
+    not_found: 'danger',
+    damaged: 'warning',
+    scrapped: 'info',
+    transferred: 'primary'
+  }
+  return types[status] || 'info'
+}
+
+const getMatchStatusTagType = (status) => {
+  const types = {
+    matched: 'success',
+    location_mismatch: 'warning',
+    user_mismatch: 'warning',
+    both_mismatch: 'danger'
+  }
+  return types[status] || 'info'
+}
+
+const getReviewStatusTagType = (status) => {
+  const types = {
+    pending: 'warning',
+    approved: 'success',
+    rejected: 'danger'
+  }
+  return types[status] || 'info'
+}
+
+const getProgressStatus = (percentage) => {
+  if (percentage >= 100) return 'success'
+  if (percentage >= 70) return 'primary'
+  if (percentage >= 30) return 'warning'
+  return 'exception'
+}
+
+// 过滤器
+const currency = (value) => {
+  if (!value) return '¥0.00'
+  return '¥' + parseFloat(value).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')
+}
 </script>
 
 <style scoped>
-.inventory-page {
+.inventory-management {
   padding: 20px;
 }
 
-.card-header {
+.toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.scan-container {
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-.scan-area {
   margin-bottom: 20px;
 }
 
-.camera-area {
-  margin-top: 20px;
-  text-align: center;
+.filters {
+  background: #f5f7fa;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 4px;
 }
 
-.camera-area video {
-  max-width: 100%;
-  max-height: 400px;
-}
-
-.scan-progress {
+.statistics-panel {
   margin-bottom: 20px;
 }
 
-.progress-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.stat-item {
+.stat-card {
+  background: white;
+  padding: 20px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   text-align: center;
-  padding: 10px;
 }
 
 .stat-value {
   font-size: 24px;
   font-weight: bold;
-  color: #303133;
+  color: #409eff;
+  margin-bottom: 8px;
 }
 
 .stat-label {
   font-size: 14px;
-  color: #909399;
-  margin-top: 5px;
+  color: #666;
+}
+
+.tasks-section {
+  background: white;
+  border-radius: 4px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.pagination {
+  padding: 20px 0;
+  text-align: right;
+}
+
+.todays-tasks {
+  background: white;
+  border-radius: 4px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.task-card {
+  margin-bottom: 20px;
+  height: 100%;
+}
+
+.task-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.task-card-content {
+  padding: 10px 0;
+}
+
+.task-info {
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+.task-info div {
+  margin-bottom: 5px;
+  color: #666;
+}
+
+.task-info .el-icon {
+  margin-right: 5px;
+  color: #409eff;
+}
+
+.task-actions {
+  margin-top: 15px;
+  text-align: center;
+}
+
+.tabs-section {
+  background: white;
+  border-radius: 4px;
+  padding: 20px;
+}
+
+.empty-state {
+  padding: 40px;
+  text-align: center;
+  color: #999;
+}
+
+.review-list, .issue-list {
+  display: grid;
+  gap: 15px;
+}
+
+.review-card, .issue-card {
+  margin-bottom: 15px;
+}
+
+.review-header, .issue-card-header {
+  padding: 0 0 10px;
+}
+
+.review-title, .issue-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.review-meta, .issue-meta {
+  display: flex;
+  gap: 15px;
+  font-size: 12px;
+  color: #666;
+}
+
+.review-content, .issue-content {
+  padding: 10px 0;
+}
+
+.review-info, .issue-details {
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+.review-info div, .issue-details div {
+  margin-bottom: 5px;
+}
+
+.review-actions, .issue-actions {
+  text-align: right;
 }
 </style>

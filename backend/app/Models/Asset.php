@@ -119,6 +119,16 @@ class Asset extends Model
         return $this->hasOne(DisposalRecord::class)->latest();
     }
 
+    public function inventoryRecords()
+    {
+        return $this->hasMany(InventoryRecord::class)->orderBy('inventory_date', 'desc');
+    }
+
+    public function latestInventory()
+    {
+        return $this->hasOne(InventoryRecord::class)->latest();
+    }
+
     public function scopeAssigned($query)
     {
         return $query->where('status', 'assigned');

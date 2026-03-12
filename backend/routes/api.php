@@ -127,6 +127,50 @@ Route::middleware('auth:sanctum')->group(function () {
         \App\Http\Controllers\DisposalController::class, 'assetHistory']);
     Route::post('/disposal/export', [
         \App\Http\Controllers\DisposalController::class, 'export']);
+
+    // 盘点管理
+    Route::get('/inventory/tasks', [
+        \App\Http\Controllers\InventoryController::class, 'tasks']);
+    Route::post('/inventory/tasks', [
+        \App\Http\Controllers\InventoryController::class, 'createTask']);
+    Route::get('/inventory/tasks/{task}', [
+        \App\Http\Controllers\InventoryController::class, 'taskDetail']);
+    Route::put('/inventory/tasks/{task}', [
+        \App\Http\Controllers\InventoryController::class, 'updateTask']);
+    Route::post('/inventory/tasks/{task}/start', [
+        \App\Http\Controllers\InventoryController::class, 'startTask']);
+    Route::post('/inventory/tasks/{task}/complete', [
+        \App\Http\Controllers\InventoryController::class, 'completeTask']);
+    Route::post('/inventory/tasks/{task}/cancel', [
+        \App\Http\Controllers\InventoryController::class, 'cancelTask']);
+    
+    Route::get('/inventory/records', [
+        \App\Http\Controllers\InventoryController::class, 'records']);
+    Route::post('/inventory/records', [
+        \App\Http\Controllers\InventoryController::class, 'createRecord']);
+    Route::get('/inventory/records/{record}', [
+        \App\Http\Controllers\InventoryController::class, 'recordDetail']);
+    Route::post('/inventory/records/{record}/review', [
+        \App\Http\Controllers\InventoryController::class, 'reviewRecord']);
+    
+    Route::get('/inventory/statistics', [
+        \App\Http\Controllers\InventoryController::class, 'statistics']);
+    Route::get('/inventory/pending-reviews', [
+        \App\Http\Controllers\InventoryController::class, 'pendingReviews']);
+    Route::get('/inventory/issue-records', [
+        \App\Http\Controllers\InventoryController::class, 'issueRecords']);
+    Route::get('/inventory/todays-tasks', [
+        \App\Http\Controllers\InventoryController::class, 'todaysTasks']);
+    Route::get('/inventory/overdue-tasks', [
+        \App\Http\Controllers\InventoryController::class, 'overdueTasks']);
+    
+    Route::get('/assets/{asset}/inventory/history', [
+        \App\Http\Controllers\InventoryController::class, 'assetHistory']);
+    
+    Route::post('/inventory/scan-qr', [
+        \App\Http\Controllers\InventoryController::class, 'scanQrCode']);
+    Route::post('/inventory/export', [
+        \App\Http\Controllers\InventoryController::class, 'export']);
 });
 
 Route::get('/', function () {
