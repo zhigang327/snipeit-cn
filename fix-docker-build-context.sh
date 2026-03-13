@@ -1,6 +1,6 @@
 #!/bin/bash
-# 修复Docker构建上下文问题脚本
-# 解决COPY ../.env.example路径错误
+# 修复Docker构建上下文和语法问题脚本
+# 解决COPY ../.env.example路径错误和COPY命令语法错误
 
 set -e
 

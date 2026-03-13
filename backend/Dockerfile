@@ -1,6 +1,6 @@
 # Snipe-CN官方稳定版Dockerfile
-# 版本: 1.6.0-stable
-# 日期: 2026-03-12
+# 版本: 1.6.3-stable
+# 日期: 2026-03-13
 # 特点: 整合所有历史问题解决方案，构建成功率100%
 
 FROM php:8.2-fpm
@@ -39,7 +39,7 @@ WORKDIR /var/www/html
 
 # 复制必要的配置文件（包括.env.example）
 COPY composer.json composer.lock ./
-COPY .env.example .env.example 2>/dev/null || true
+COPY .env.example .env.example
 
 # 设置Composer国内镜像（确保网络稳定性）
 RUN composer config -g repo.packagist composer https://mirrors.aliyun.com/composer/

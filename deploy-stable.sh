@@ -7,7 +7,7 @@ set -e
 # ====================
 # 配置区域
 # ====================
-SCRIPT_VERSION="1.6.2-stable"
+SCRIPT_VERSION="1.6.3-stable"
 SCRIPT_DATE="2026-03-13"
 
 # 颜色定义
@@ -524,7 +524,7 @@ COPY --from=composer:2.6.6 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 
 # 复制应用代码，先不复制vendor目录
-COPY --exclude=vendor . .
+COPY . .
 
 # 方案1: 如果有vendor目录，直接复制（离线模式）
 # 方案2: 如果没有vendor目录，尝试网络安装（带超时和重试）
@@ -559,8 +559,7 @@ RUN echo "检查依赖安装方案..." && \
         fi; \
     fi
 
-# 复制可能错过的vendor目录（如果有的话）
-COPY --exclude=*.php vendor/ ./vendor/ 2>/dev/null || true
+
 
 # 设置权限
 RUN mkdir -p storage bootstrap/cache \

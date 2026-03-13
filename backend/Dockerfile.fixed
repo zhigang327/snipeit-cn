@@ -45,7 +45,7 @@ WORKDIR /var/www/html
 
 # 复制composer.json文件
 COPY composer.json .
-COPY .env.example .env.example 2>/dev/null || true
+COPY .env.example .env.example
 
 # 步骤1: 设置Composer配置（不使用全局配置，避免权限问题）
 RUN composer config repo.packagist composer https://mirrors.aliyun.com/composer/ && \

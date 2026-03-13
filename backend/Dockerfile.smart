@@ -131,7 +131,7 @@ WORKDIR /var/www/html
 
 # 复制composer配置
 COPY composer.json composer.lock ./
-COPY .env.example .env.example 2>/dev/null || true
+COPY .env.example .env.example
 
 # 设置Composer国内镜像（确保网络稳定性）
 RUN composer config -g repo.packagist composer https://mirrors.aliyun.com/composer/
