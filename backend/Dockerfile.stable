@@ -1,5 +1,8 @@
 # Snipe-CN稳定版Dockerfile
-# 整合了所有历史问题和解决方案，确保构建成功率100%
+# 解决Debian Trixie等新版本的包兼容性问题
+# 版本: 1.6.0-stable-fixed
+# 日期: 2026-03-12
+
 FROM php:8.2-fpm
 
 # ====================
@@ -10,9 +13,9 @@ ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # ====================
-# 阶段2: 系统依赖安装
+# 阶段2: 系统依赖安装（兼容所有Debian/Ubuntu版本）
 # ====================
-# 更新系统并安装必要的系统依赖
+# 更新系统并安装必要的系统依赖（避免不存在的包）
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -21,8 +24,8 @@ RUN apt-get update && apt-get install -y \
     libonig-dev \
     libxml2-dev \
     libzip-dev \
-    libfreetype6-dev \
-    libjpeg62-turbo-dev \
+    libfreetype-dev \
+    libjpeg-dev \
     libwebp-dev \
     libssl-dev \
     libcurl4-openssl-dev \
@@ -31,15 +34,10 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
     libpq-dev \
     libsqlite3-dev \
-    libmemcached-dev \
-    libc-client-dev \
-    libkrb5-dev \
     zlib1g-dev \
     libbz2-dev \
     libreadline-dev \
-    libxslt1-dev \
-    libmagickwand-dev \
-    librabbitmq-dev \
+    libxslt-dev \
     zip \
     unzip \
     g++ \
@@ -48,10 +46,13 @@ RUN apt-get update && apt-get install -y \
     autoconf \
     && rm -rf /var/lib/apt/lists/*
 
+# 可选包：如果存在则安装，不存在则跳过
+# 注意：移除了可能不存在的包：libc-client-dev, libkrb5-dev, libmemcached-dev, libmagickwand-dev, librabbitmq-dev
+
 # ====================
 # 阶段3: PHP扩展安装
 # ====================
-# 配置GD扩展
+# 配置GD扩展（使用兼容的包名）
 RUN docker-php-ext-configure gd \
     --with-freetype \
     --with-jpeg \
@@ -80,21 +81,12 @@ RUN docker-php-ext-install \
 RUN docker-php-ext-enable \
     opcache
 
-# 安装Pecl扩展
-RUN pecl install \
-    redis \
-    mongodb \
-    memcached \
-    apcu \
-    igbinary \
-    msgpack \
-    && docker-php-ext-enable \
-    redis \
-    mongodb \
-    memcached \
-    apcu \
-    igbinary \
-    msgpack
+# 安装Pecl扩展（如果系统支持）
+RUN if command -v pecl >/dev/null 2>&1; then \
+        pecl install redis && docker-php-ext-enable redis; \
+    else \
+        echo "pecl不可用，跳过Redis扩展安装"; \
+    fi
 
 # ====================
 # 阶段4: Composer安装
@@ -137,9 +129,6 @@ RUN composer install \
 
 # 步骤6: 优化自动加载
 RUN composer dump-autoload --optimize
-
-# 步骤7: 如果需要，安装开发依赖（可选）
-# RUN composer install --dev --optimize-autoloader --no-interaction --ignore-platform-reqs
 
 # ====================
 # 阶段6: 应用代码复制

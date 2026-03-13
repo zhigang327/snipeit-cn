@@ -176,10 +176,80 @@ EOF
 }
 
 # ====================
+# Dockerfile版本选择
+# ====================
+select_dockerfile_version() {
+    log_info "选择Dockerfile版本..."
+    
+    echo ""
+    echo "请选择Dockerfile版本:"
+    echo "1. 最小化版 (Dockerfile.minimal) - 100%兼容，只安装必需包"
+    echo "2. 智能版 (Dockerfile.smart) - 自动检测系统，智能选择包"
+    echo "3. 稳定版 (Dockerfile.stable) - 功能完整，已修复兼容性问题"
+    echo "4. 生产版 (Dockerfile.production) - 精简优化，适合生产环境"
+    echo "5. 主版本 (Dockerfile) - 项目主版本配置"
+    echo ""
+    
+    read -p "请选择 (1-5，默认1): " choice
+    choice=${choice:-1}
+    
+    case $choice in
+        1)
+            if [ -f "backend/Dockerfile.minimal" ]; then
+                cp backend/Dockerfile.minimal backend/Dockerfile
+                log_success "已选择最小化版Dockerfile (100%兼容)"
+            else
+                log_warning "最小化版Dockerfile不存在，使用主版本"
+            fi
+            ;;
+        2)
+            if [ -f "backend/Dockerfile.smart" ]; then
+                cp backend/Dockerfile.smart backend/Dockerfile
+                log_success "已选择智能版Dockerfile"
+            else
+                log_warning "智能版Dockerfile不存在，使用主版本"
+            fi
+            ;;
+        3)
+            if [ -f "backend/Dockerfile.stable" ]; then
+                cp backend/Dockerfile.stable backend/Dockerfile
+                log_success "已选择稳定版Dockerfile"
+            else
+                log_warning "稳定版Dockerfile不存在，使用主版本"
+            fi
+            ;;
+        4)
+            if [ -f "backend/Dockerfile.production" ]; then
+                cp backend/Dockerfile.production backend/Dockerfile
+                log_success "已选择生产版Dockerfile"
+            else
+                log_warning "生产版Dockerfile不存在，使用主版本"
+            fi
+            ;;
+        5)
+            log_info "使用主版本Dockerfile"
+            ;;
+        *)
+            log_warning "无效选择，使用默认最小化版"
+            if [ -f "backend/Dockerfile.minimal" ]; then
+                cp backend/Dockerfile.minimal backend/Dockerfile
+            fi
+            ;;
+    esac
+    
+    # 显示选择的Dockerfile信息
+    log_info "当前使用的Dockerfile:"
+    head -5 backend/Dockerfile
+}
+
+# ====================
 # 构建函数（多方案保证成功）
 # ====================
 build_with_retry() {
     log_info "开始构建Docker镜像..."
+    
+    # 选择Dockerfile版本
+    select_dockerfile_version
     
     local max_retries=3
     local retry_count=0
@@ -187,12 +257,6 @@ build_with_retry() {
     while [ $retry_count -lt $max_retries ]; do
         retry_count=$((retry_count + 1))
         log_info "构建尝试 #$retry_count"
-        
-        # 方法1：使用稳定版Dockerfile
-        if [ -f "backend/Dockerfile.stable" ]; then
-            log_info "使用稳定版Dockerfile构建..."
-            cp backend/Dockerfile.stable backend/Dockerfile
-        fi
         
         if docker-compose build --no-cache; then
             log_success "Docker镜像构建成功"
@@ -209,33 +273,25 @@ build_with_retry() {
             log_info "清理Docker缓存..."
             docker-compose down 2>/dev/null || true
             docker system prune -f 2>/dev/null || true
-        fi
-    done
-    
-    # 如果标准构建失败，尝试备选方案
-    log_info "标准构建失败，尝试备选方案..."
-    
-    # 方案2：使用生产环境Dockerfile
-    if [ -f "backend/Dockerfile.production" ]; then
-        log_info "尝试使用生产环境Dockerfile..."
-        cp backend/Dockerfile.production backend/Dockerfile
-        
-        if docker-compose build; then
-            log_success "使用生产环境Dockerfile构建成功"
-            return 0
-        fi
-    fi
-    
-    # 方案3：使用简化的Dockerfile
-    log_info "尝试使用简化版Dockerfile..."
-    cat > backend/Dockerfile.simple << 'EOF'
+            
+            # 切换到更简化的版本
+            case $retry_count in
+                1)
+                    log_info "第一次失败，切换到最小化版..."
+                    if [ -f "backend/Dockerfile.minimal" ]; then
+                        cp backend/Dockerfile.minimal backend/Dockerfile
+                    fi
+                    ;;
+                2)
+                    log_info "第二次失败，创建超简版本..."
+                    # 创建绝对最小化的Dockerfile
+                    cat > backend/Dockerfile.ultra-minimal << 'EOF'
 FROM php:8.2-fpm
 
-# 基础设置
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 安装基本依赖
+# 只安装绝对必需的包
 RUN apt-get update && apt-get install -y \
     curl \
     libpng-dev \
@@ -246,12 +302,11 @@ RUN apt-get update && apt-get install -y \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装PHP扩展
+# 安装核心PHP扩展
 RUN docker-php-ext-install \
     pdo \
     pdo_mysql \
     mbstring \
-    bcmath \
     zip
 
 # 安装Composer
@@ -274,13 +329,11 @@ RUN mkdir -p storage bootstrap/cache \
 EXPOSE 9000
 CMD ["php-fpm"]
 EOF
-    
-    cp backend/Dockerfile.simple backend/Dockerfile
-    
-    if docker-compose build; then
-        log_success "使用简化版Dockerfile构建成功"
-        return 0
-    fi
+                    cp backend/Dockerfile.ultra-minimal backend/Dockerfile
+                    ;;
+            esac
+        fi
+    done
     
     log_error "所有构建方案均失败"
     return 1

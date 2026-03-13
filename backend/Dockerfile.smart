@@ -1,0 +1,225 @@
+# Snipe-CN智能版Dockerfile
+# 自动检测系统并选择合适的包，解决兼容性问题
+# 版本: 1.6.0-smart
+# 日期: 2026-03-12
+
+FROM php:8.2-fpm
+
+# 基础配置
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# 智能包安装：检测系统版本并选择合适的包
+RUN set -ex; \
+    echo "检测系统版本..."; \
+    # 获取Debian版本代号
+    if [ -f /etc/os-release ]; then \
+        . /etc/os-release; \
+        echo "系统: $ID $VERSION_ID"; \
+        # 根据版本选择包安装策略
+        case "$ID-$VERSION_ID" in \
+            debian-12|debian-trixie|debian-bookworm) \
+                echo "检测到Debian 12/Bookworm/Trixie，使用兼容包列表"; \
+                apt-get update && apt-get install -y \
+                    curl \
+                    wget \
+                    git \
+                    libpng-dev \
+                    libonig-dev \
+                    libxml2-dev \
+                    libzip-dev \
+                    libfreetype-dev \
+                    libjpeg-dev \
+                    libwebp-dev \
+                    libssl-dev \
+                    libcurl4-openssl-dev \
+                    zip \
+                    unzip \
+                    g++ \
+                    make \
+                    pkg-config \
+                    autoconf \
+                    && rm -rf /var/lib/apt/lists/*; \
+                ;; \
+            debian-11|debian-bullseye|ubuntu-22.04|ubuntu-20.04) \
+                echo "检测到Debian 11/Ubuntu 20.04+/22.04+，使用标准包列表"; \
+                apt-get update && apt-get install -y \
+                    curl \
+                    wget \
+                    git \
+                    libpng-dev \
+                    libonig-dev \
+                    libxml2-dev \
+                    libzip-dev \
+                    libfreetype6-dev \
+                    libjpeg62-turbo-dev \
+                    libwebp-dev \
+                    libssl-dev \
+                    libcurl4-openssl-dev \
+                    libgmp-dev \
+                    libldap2-dev \
+                    libicu-dev \
+                    libpq-dev \
+                    libsqlite3-dev \
+                    zip \
+                    unzip \
+                    g++ \
+                    make \
+                    pkg-config \
+                    autoconf \
+                    && rm -rf /var/lib/apt/lists/*; \
+                ;; \
+            *) \
+                echo "未知系统版本，使用最小包列表"; \
+                apt-get update && apt-get install -y \
+                    curl \
+                    wget \
+                    git \
+                    libpng-dev \
+                    libonig-dev \
+                    libxml2-dev \
+                    libzip-dev \
+                    zip \
+                    unzip \
+                    && rm -rf /var/lib/apt/lists/*; \
+                ;; \
+        esac; \
+    else \
+        echo "无法检测系统版本，使用最小包列表"; \
+        apt-get update && apt-get install -y \
+            curl \
+            wget \
+            git \
+            libpng-dev \
+            libonig-dev \
+            libxml2-dev \
+            libzip-dev \
+            zip \
+            unzip \
+            && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# 安装PHP扩展（根据可用性选择）
+RUN docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    mbstring \
+    bcmath \
+    zip \
+    opcache
+
+# 尝试安装可选扩展（如果系统支持）
+RUN if dpkg -l | grep -q libfreetype-dev || dpkg -l | grep -q libfreetype6-dev; then \
+        docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp; \
+        docker-php-ext-install gd; \
+    else \
+        echo "GD扩展依赖不可用，跳过安装"; \
+    fi
+
+# 尝试安装其他可选扩展
+RUN if dpkg -l | grep -q libicu-dev; then \
+        docker-php-ext-install intl; \
+    else \
+        echo "Intl扩展依赖不可用，跳过安装"; \
+    fi
+
+# 安装Composer（使用多阶段构建避免网络问题）
+COPY --from=composer:2.6.6 /usr/bin/composer /usr/bin/composer
+
+# 设置工作目录
+WORKDIR /var/www/html
+
+# 复制composer配置
+COPY composer.json composer.lock ./
+
+# 设置Composer国内镜像（确保网络稳定性）
+RUN composer config -g repo.packagist composer https://mirrors.aliyun.com/composer/
+
+# 清理缓存
+RUN composer clear-cache
+
+# 安装依赖（三重保障方案）
+RUN set -ex; \
+    echo "开始安装PHP依赖..."; \
+    # 方法1: 标准安装
+    composer install \
+        --no-dev \
+        --optimize-autoloader \
+        --no-interaction \
+        --no-scripts \
+        --prefer-dist \
+        --ignore-platform-reqs \
+    || \
+    # 方法2: 如果方法1失败，清理缓存后重试
+    ( \
+        echo "第一次安装失败，清理缓存后重试..."; \
+        composer clear-cache; \
+        composer install \
+            --no-dev \
+            --optimize-autoloader \
+            --no-interaction \
+            --no-scripts \
+            --prefer-dist \
+            --ignore-platform-reqs \
+            --prefer-stable \
+    ) \
+    || \
+    # 方法3: 如果仍然失败，使用最小化安装
+    ( \
+        echo "前两次安装失败，使用最小化安装..."; \
+        composer install \
+            --no-dev \
+            --no-interaction \
+            --no-autoloader \
+            --ignore-platform-reqs \
+    && composer dump-autoload --optimize \
+    )
+
+# 复制应用代码
+COPY . .
+
+# 设置目录权限
+RUN mkdir -p \
+    storage \
+    storage/framework \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/framework/cache \
+    storage/logs \
+    bootstrap/cache
+
+RUN chown -R www-data:www-data \
+    storage \
+    bootstrap/cache
+
+RUN chmod -R 775 \
+    storage \
+    bootstrap/cache
+
+# 如果没有.env文件，从示例创建
+RUN if [ ! -f .env ]; then \
+        cp .env.example .env; \
+    fi
+
+# 生成应用密钥（如果不存在）
+RUN if ! grep -q "^APP_KEY=" .env; then \
+        php artisan key:generate; \
+    fi
+
+# 优化应用
+RUN composer dump-autoload --optimize && \
+    php artisan optimize
+
+# 清理
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# 暴露端口
+EXPOSE 9000
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+    CMD php -r "echo 'OK'; exit(0);" || exit 1
+
+# 启动命令
+CMD ["php-fpm"]
