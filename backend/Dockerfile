@@ -105,19 +105,24 @@ RUN chmod -R 775 \
     storage \
     bootstrap/cache
 
-# 如果没有.env文件，从示例创建
-RUN if [ ! -f .env ]; then \
+# 确保artisan文件有执行权限
+RUN chmod +x artisan 2>/dev/null || true
+
+# 复制启动脚本并设置权限
+COPY startup.sh /usr/local/bin/startup.sh
+RUN chmod +x /usr/local/bin/startup.sh
+
+# 如果没有.env文件，从示例创建（简化版，详细信息在启动脚本中处理）
+RUN if [ ! -f .env ] && [ -f .env.example ]; then \
         cp .env.example .env; \
+        echo "从.env.example创建.env文件"; \
     fi
 
-# 生成应用密钥（如果不存在）
-RUN if ! grep -q "^APP_KEY=" .env; then \
-        php artisan key:generate; \
-    fi
+# 优化自动加载器
+RUN composer dump-autoload --optimize 2>/dev/null || echo "自动加载器优化跳过"
 
-# 优化应用
-RUN composer dump-autoload --optimize && \
-    php artisan optimize
+# 注意：应用密钥生成和数据库初始化将在容器启动时执行
+# 这样可以避免构建时的环境依赖问题
 
 # 清理
 RUN apt-get clean && \
@@ -130,5 +135,5 @@ EXPOSE 9000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
     CMD php -r "echo 'OK'; exit(0);" || exit 1
 
-# 启动命令
-CMD ["php-fpm"]
+# 启动命令：使用启动脚本执行初始化任务，然后启动PHP-FPM
+CMD ["startup.sh"]
