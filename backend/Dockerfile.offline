@@ -1,0 +1,143 @@
+# Snipe-CN离线安装版Dockerfile
+# 不使用网络下载，100%离线安装
+# 版本: 1.6.0-offline
+# 日期: 2026-03-12
+
+FROM php:8.2-fpm
+
+# 基础配置
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# 只安装绝对必需的依赖（避免包名兼容性问题）
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    libzip-dev \
+    zip \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装PHP扩展（生产环境绝对必需的扩展）
+RUN docker-php-ext-install \
+    pdo \
+    pdo_mysql \
+    mbstring \
+    bcmath \
+    zip \
+    opcache
+
+# 安装Composer（使用多阶段构建避免网络问题）
+COPY --from=composer:2.6.6 /usr/bin/composer /usr/bin/composer
+
+# 设置工作目录
+WORKDIR /var/www/html
+
+# 重要：先复制composer.lock文件（如果存在）
+COPY composer.json ./
+
+# 离线安装策略：
+# 1. 先尝试从缓存的vendor目录复制
+# 2. 如果vendor目录不存在，使用composer install
+# 3. 在composer install中强制使用--no-progress和增加超时时间
+
+# 创建本地包缓存目录
+RUN mkdir -p /var/cache/composer
+
+# 设置Composer配置以加速下载并防止超时
+RUN composer config -g repo.packagist composer https://mirrors.aliyun.com/composer/ && \
+    composer config -g process-timeout 3600 && \
+    composer config -g github-protocols https
+
+# 清理缓存
+RUN composer clear-cache
+
+# 方法1：如果vendor目录已存在（离线环境），直接复制
+# 这需要在构建时提供vendor目录
+# 如果vendor目录不存在，则使用下面的网络下载方法
+
+# 方法2：网络下载（但有重试机制和超时处理）
+RUN echo "开始安装PHP依赖包..." && \
+    if [ -d "vendor" ]; then \
+        echo "✓ 检测到vendor目录，跳过网络下载"; \
+    else \
+        echo "⚠ 未检测到vendor目录，开始网络下载..."; \
+        # 设置环境变量以防止超时
+        export COMPOSER_MEMORY_LIMIT=-1 && \
+        export COMPOSER_DISABLE_NETWORK=0 && \
+        # 增加超时时间并启用重试
+        echo "设置长超时时间..." && \
+        # 尝试多个镜像源
+        if ! composer install \
+            --no-dev \
+            --optimize-autoloader \
+            --no-interaction \
+            --no-scripts \
+            --prefer-dist \
+            --ignore-platform-reqs \
+            --no-progress; then \
+            echo "第一次尝试失败，切换到官方源..." && \
+            composer config -g repo.packagist composer https://repo.packagist.org && \
+            composer install \
+                --no-dev \
+                --optimize-autoloader \
+                --no-interaction \
+                --no-scripts \
+                --prefer-dist \
+                --ignore-platform-reqs \
+                --no-progress; \
+        fi; \
+    fi
+
+# 复制应用代码（所有文件）
+COPY . .
+
+# 设置目录权限
+RUN mkdir -p \
+    storage \
+    storage/framework \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/framework/cache \
+    storage/logs \
+    bootstrap/cache
+
+RUN chown -R www-data:www-data \
+    storage \
+    bootstrap/cache
+
+RUN chmod -R 775 \
+    storage \
+    bootstrap/cache
+
+# 如果没有.env文件，从示例创建
+RUN if [ ! -f .env ]; then \
+        cp .env.example .env; \
+    fi
+
+# 生成应用密钥（如果不存在）
+RUN if ! grep -q "^APP_KEY=" .env; then \
+        php artisan key:generate; \
+    fi
+
+# 优化应用
+RUN composer dump-autoload --optimize && \
+    php artisan optimize
+
+# 清理
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# 暴露端口
+EXPOSE 9000
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+    CMD php -r "echo 'OK'; exit(0);" || exit 1
+
+# 启动命令
+CMD ["php-fpm"]

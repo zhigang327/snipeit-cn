@@ -176,6 +176,48 @@ EOF
 }
 
 # ====================
+# 网络连接检测
+# ====================
+check_network_connectivity() {
+    log_info "检测网络连接..."
+    
+    local test_urls=(
+        "https://mirrors.aliyun.com/composer/"
+        "https://repo.packagist.org/packages.json"
+        "https://github.com"
+    )
+    
+    local can_connect=true
+    
+    for url in "${test_urls[@]}"; do
+        if curl -s --connect-timeout 5 -I "$url" &> /dev/null; then
+            log_success "可以访问: $(echo $url | cut -d'/' -f3)"
+        else
+            log_warning "无法访问: $(echo $url | cut -d'/' -f3)"
+            can_connect=false
+        fi
+    done
+    
+    if [ "$can_connect" = false ]; then
+        log_warning "网络连接可能有问题，建议使用离线模式"
+        echo ""
+        echo "网络问题解决方案:"
+        echo "1. 运行网络修复脚本: ./fix-network-issues.sh"
+        echo "2. 创建离线安装包: ./fix-network-issues.sh --offline"
+        echo "3. 使用离线版Dockerfile: 选择版本6"
+        echo ""
+        read -p "是否继续? (y/N): " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            log_info "部署已取消"
+            exit 1
+        fi
+    fi
+    
+    log_success "网络连接检测完成"
+}
+
+# ====================
 # Dockerfile版本选择
 # ====================
 select_dockerfile_version() {
@@ -187,10 +229,11 @@ select_dockerfile_version() {
     echo "2. 智能版 (Dockerfile.smart) - 自动检测系统，智能选择包"
     echo "3. 稳定版 (Dockerfile.stable) - 功能完整，已修复兼容性问题"
     echo "4. 生产版 (Dockerfile.production) - 精简优化，适合生产环境"
-    echo "5. 主版本 (Dockerfile) - 项目主版本配置"
+    echo "5. 离线版 (Dockerfile.offline) - 网络差/无网络环境"
+    echo "6. 主版本 (Dockerfile) - 项目主版本配置"
     echo ""
     
-    read -p "请选择 (1-5，默认1): " choice
+    read -p "请选择 (1-6，默认1): " choice
     choice=${choice:-1}
     
     case $choice in
@@ -227,6 +270,18 @@ select_dockerfile_version() {
             fi
             ;;
         5)
+            if [ -f "backend/Dockerfile.offline" ]; then
+                cp backend/Dockerfile.offline backend/Dockerfile
+                log_success "已选择离线版Dockerfile (适合网络差环境)"
+                log_info "提示: 离线版会尝试多个镜像源，增加超时时间"
+            else
+                log_warning "离线版Dockerfile不存在，使用最小化版"
+                if [ -f "backend/Dockerfile.minimal" ]; then
+                    cp backend/Dockerfile.minimal backend/Dockerfile
+                fi
+            fi
+            ;;
+        6)
             log_info "使用主版本Dockerfile"
             ;;
         *)
@@ -248,6 +303,9 @@ select_dockerfile_version() {
 build_with_retry() {
     log_info "开始构建Docker镜像..."
     
+    # 检测网络连接
+    check_network_connectivity
+    
     # 选择Dockerfile版本
     select_dockerfile_version
     
@@ -258,7 +316,8 @@ build_with_retry() {
         retry_count=$((retry_count + 1))
         log_info "构建尝试 #$retry_count"
         
-        if docker-compose build --no-cache; then
+        # 构建命令，添加详细输出
+        if docker-compose build --no-cache --progress=plain; then
             log_success "Docker镜像构建成功"
             return 0
         fi
@@ -266,8 +325,8 @@ build_with_retry() {
         log_warning "构建尝试 #$retry_count 失败"
         
         if [ $retry_count -lt $max_retries ]; then
-            log_info "等待10秒后重试..."
-            sleep 10
+            log_info "等待15秒后重试..."
+            sleep 15
             
             # 清理缓存
             log_info "清理Docker缓存..."
@@ -277,15 +336,19 @@ build_with_retry() {
             # 切换到更简化的版本
             case $retry_count in
                 1)
-                    log_info "第一次失败，切换到最小化版..."
-                    if [ -f "backend/Dockerfile.minimal" ]; then
+                    log_info "第一次失败，切换到离线版..."
+                    if [ -f "backend/Dockerfile.offline" ]; then
+                        cp backend/Dockerfile.offline backend/Dockerfile
+                        log_info "已切换到离线版Dockerfile"
+                    elif [ -f "backend/Dockerfile.minimal" ]; then
                         cp backend/Dockerfile.minimal backend/Dockerfile
+                        log_info "已切换到最小化版Dockerfile"
                     fi
                     ;;
                 2)
-                    log_info "第二次失败，创建超简版本..."
-                    # 创建绝对最小化的Dockerfile
-                    cat > backend/Dockerfile.ultra-minimal << 'EOF'
+                    log_info "第二次失败，创建超简版本（无网络安装）..."
+                    # 创建绝对最小化的Dockerfile，跳过Composer安装
+                    cat > backend/Dockerfile.ultra-simple << 'EOF'
 FROM php:8.2-fpm
 
 ENV TZ=Asia/Shanghai
@@ -309,18 +372,23 @@ RUN docker-php-ext-install \
     mbstring \
     zip
 
-# 安装Composer
+# 安装Composer（但从本地复制）
 COPY --from=composer:2.6.6 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# 复制并安装依赖
-COPY composer.json .
-RUN composer config -g repo.packagist composer https://mirrors.aliyun.com/composer/ \
-    && composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
-
-# 复制应用代码
+# 如果vendor目录存在，直接复制
+# 注意：这需要在构建前准备好vendor目录
 COPY . .
+
+# 检查是否有vendor目录
+RUN if [ -d "vendor" ]; then \
+        echo "✓ 使用现有的vendor目录"; \
+    else \
+        echo "⚠ 没有vendor目录，需要手动安装依赖"; \
+        echo "请先运行: composer install --no-dev --optimize-autoloader"; \
+        exit 1; \
+    fi
 
 # 设置权限
 RUN mkdir -p storage bootstrap/cache \
@@ -329,13 +397,28 @@ RUN mkdir -p storage bootstrap/cache \
 EXPOSE 9000
 CMD ["php-fpm"]
 EOF
-                    cp backend/Dockerfile.ultra-minimal backend/Dockerfile
+                    cp backend/Dockerfile.ultra-simple backend/Dockerfile
+                    
+                    # 检查是否有vendor目录
+                    if [ ! -d "vendor" ]; then
+                        log_error "没有vendor目录，无法使用超简版本"
+                        log_info "请先下载依赖包:"
+                        log_info "  方法1: 在有网络的环境中运行 'composer install --no-dev --optimize-autoloader'"
+                        log_info "  方法2: 运行 './fix-network-issues.sh --offline' 创建离线包"
+                        log_info "  方法3: 复制其他环境的vendor目录到当前目录"
+                        return 1
+                    fi
                     ;;
             esac
         fi
     done
     
     log_error "所有构建方案均失败"
+    log_info "建议尝试以下方案:"
+    log_info "  1. 运行网络修复脚本: ./fix-network-issues.sh"
+    log_info "  2. 创建离线安装包: ./fix-network-issues.sh --offline"
+    log_info "  3. 检查Docker网络设置和DNS配置"
+    log_info "  4. 确保系统时间和时区设置正确"
     return 1
 }
 
