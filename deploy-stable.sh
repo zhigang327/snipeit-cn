@@ -7,7 +7,7 @@ set -e
 # ====================
 # 配置区域
 # ====================
-SCRIPT_VERSION="1.6.4-stable"
+SCRIPT_VERSION="1.6.5-stable"
 SCRIPT_DATE="2026-03-13"
 
 # 颜色定义
@@ -352,6 +352,30 @@ check_required_files() {
         log_success "找到composer.json文件"
     fi
     
+    # 检查package.json文件
+    if [ ! -f "frontend/package.json" ]; then
+        missing_files+=("frontend/package.json")
+    else
+        log_success "找到package.json文件"
+    fi
+    
+    # 检查package-lock.json文件，如果不存在则创建
+    if [ ! -f "frontend/package-lock.json" ]; then
+        log_warning "package-lock.json文件不存在，创建默认版本..."
+        cat > frontend/package-lock.json << 'EOF'
+{
+  "name": "snipe-cn-frontend",
+  "version": "1.0.0",
+  "lockfileVersion": 2,
+  "requires": true,
+  "packages": {}
+}
+EOF
+        log_success "已创建默认package-lock.json文件"
+    else
+        log_success "找到package-lock.json文件"
+    fi
+    
     # 如果缺少文件，尝试修复
     if [ ${#missing_files[@]} -gt 0 ]; then
         log_warning "缺少必要的文件: ${missing_files[*]}"
@@ -426,6 +450,11 @@ EOF
                     ;;
                 "backend/composer.json")
                     log_error "缺少核心文件: backend/composer.json"
+                    log_info "请确保从GitHub正确克隆项目"
+                    return 1
+                    ;;
+                "frontend/package.json")
+                    log_error "缺少核心文件: frontend/package.json"
                     log_info "请确保从GitHub正确克隆项目"
                     return 1
                     ;;

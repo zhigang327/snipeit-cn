@@ -1,5 +1,5 @@
 # Snipe-CN前端稳定版Dockerfile
-# 版本: 1.6.0-stable
+# 版本: 1.6.5-stable
 # 包含国内镜像加速和构建优化
 
 FROM node:18-alpine
@@ -21,8 +21,8 @@ RUN apk update && apk add --no-cache \
 # 设置工作目录
 WORKDIR /app
 
-# 复制package配置文件
-COPY package.json package-lock.json ./
+# 复制package配置文件（如果package-lock.json不存在，使用npm install）
+COPY package.json ./
 
 # 配置npm国内镜像（如果在中国大陆）
 RUN npm config set registry https://registry.npmmirror.com/
@@ -37,10 +37,7 @@ RUN echo "开始安装Node.js依赖..." && \
     # 方法2: 如果方法1失败，清理缓存后重试
     (echo "第一次安装失败，清理缓存后重试..." && \
      npm cache clean --force && \
-     npm install --no-audit --progress=false --legacy-peer-deps) || \
-    # 方法3: 如果仍然失败，使用CI模式
-    (echo "前两次安装失败，使用CI模式..." && \
-     npm ci --no-audit --progress=false)
+     npm install --no-audit --progress=false --legacy-peer-deps)
 
 # 复制源代码
 COPY . .
