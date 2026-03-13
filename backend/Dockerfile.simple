@@ -37,6 +37,7 @@ WORKDIR /var/www/html
 
 # 5. 复制composer.json（单独复制，利用Docker缓存）
 COPY composer.json .
+COPY .env.example .env.example 2>/dev/null || true
 
 # 6. 关键步骤：分步执行Composer命令
 # 步骤6.1: 仅设置镜像（不安装）

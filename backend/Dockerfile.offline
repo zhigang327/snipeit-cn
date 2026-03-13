@@ -39,7 +39,7 @@ WORKDIR /var/www/html
 
 # 重要：先复制composer.lock文件（如果存在）
 COPY composer.json ./
-COPY ../.env.example .env.example 2>/dev/null || true
+COPY .env.example .env.example 2>/dev/null || true
 
 # 离线安装策略：
 # 1. 先尝试从缓存的vendor目录复制

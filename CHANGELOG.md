@@ -5,6 +5,47 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/),
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.6.2] - 2026-03-13
+
+### 修复
+- 🐛 **修复Docker构建上下文错误**
+  - 解决 `COPY ../.env.example .env.example 2>/dev/null || true` 路径错误
+  - Docker构建上下文限制在 `backend` 目录，无法访问上层目录文件
+  - 将 `../.env.example` 改为 `COPY .env.example .env.example`
+  - 所有Dockerfile变体都已修复：
+    - `backend/Dockerfile`
+    - `backend/Dockerfile.offline`
+    - `backend/Dockerfile.minimal`
+    - `backend/Dockerfile.stable`
+    - `backend/Dockerfile.production`
+    - `backend/Dockerfile.smart`
+    - `backend/Dockerfile.simple`
+    - `backend/Dockerfile.fixed`
+  - 更新部署脚本自动复制 `.env.example` 到 `backend` 目录
+
+### 新增
+- 📖 **新增修复文档和工具**
+  - `FIX_DOCKER_CONTEXT_ISSUE7.md` - Docker构建上下文问题指南
+  - `fix-docker-build-context.sh` - 自动修复脚本（可选使用）
+
+### 改进
+- 🔧 **部署脚本增强**
+  - 更新 `deploy-stable.sh` 的文件检查逻辑
+  - 自动确保 `.env.example` 在 `backend` 目录中存在
+  - 更新版本号到 `1.6.2-stable`
+
+### 技术原理
+- **Docker构建上下文**: docker-compose.yml中配置 `context: ./backend`
+- **路径限制**: Docker只能访问构建上下文目录内的文件
+- **解决方案**: 将所需文件复制到构建上下文目录中
+
+### 文档
+- 新增《修复 Docker 构建上下文问题指南》
+- 更新部署流程文档
+- 完善Dockerfile编写规范
+
+---
+
 ## [1.6.1] - 2026-03-13
 
 ### 修复

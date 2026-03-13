@@ -102,7 +102,7 @@ WORKDIR /var/www/html
 # ====================
 # 复制composer.json和composer.lock（优先使用缓存）
 COPY composer.json composer.lock ./
-COPY ../.env.example .env.example 2>/dev/null || true
+COPY .env.example .env.example 2>/dev/null || true
 
 # 方法1: 使用国内镜像源 + 详细输出 + 重试机制
 # 步骤1: 设置Composer国内镜像

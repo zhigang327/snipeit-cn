@@ -7,7 +7,7 @@ set -e
 # ====================
 # 配置区域
 # ====================
-SCRIPT_VERSION="1.6.1-stable"
+SCRIPT_VERSION="1.6.2-stable"
 SCRIPT_DATE="2026-03-13"
 
 # 颜色定义
@@ -102,11 +102,44 @@ prepare_environment() {
         log_success "已备份现有.env文件"
     fi
     
+    # 确保.env.example存在（优先在backend目录中）
+    if [ ! -f "backend/.env.example" ] && [ -f ".env.example" ]; then
+        log_info "复制.env.example到backend目录..."
+        cp .env.example backend/.env.example
+    fi
+    
+    # 如果backend目录也没有.env.example，创建默认版本
+    if [ ! -f "backend/.env.example" ] && [ ! -f ".env.example" ]; then
+        log_info "创建默认.env.example文件..."
+        cp backend/.env.example .env.example 2>/dev/null || true
+        if [ ! -f ".env.example" ]; then
+            cat > .env.example << 'EOF'
+APP_NAME=Snipe-CN
+APP_ENV=production
+APP_KEY=
+APP_DEBUG=false
+APP_URL=http://localhost
+
+DB_CONNECTION=mysql
+DB_HOST=db
+DB_PORT=3306
+DB_DATABASE=snipeit
+DB_USERNAME=snipeit
+DB_PASSWORD=password
+EOF
+            cp .env.example backend/.env.example
+            log_success "已创建.env.example文件"
+        fi
+    fi
+    
     # 创建.env文件（如果不存在）
     if [ ! -f ".env" ]; then
         if [ -f ".env.example" ]; then
             cp .env.example .env
             log_success "已创建.env文件"
+        elif [ -f "backend/.env.example" ]; then
+            cp backend/.env.example .env
+            log_success "已从backend目录创建.env文件"
         else
             log_error ".env.example文件不存在"
             exit 1
@@ -306,7 +339,7 @@ check_required_files() {
     local missing_files=()
     
     # 检查.env.example文件
-    if [ ! -f ".env.example" ] && [ ! -f "../.env.example" ]; then
+    if [ ! -f ".env.example" ] && [ ! -f "backend/.env.example" ]; then
         missing_files+=(".env.example")
     else
         log_success "找到.env.example文件"
@@ -323,10 +356,10 @@ check_required_files() {
     if [ ${#missing_files[@]} -gt 0 ]; then
         log_warning "缺少必要的文件: ${missing_files[*]}"
         
-        # 尝试从上级目录查找
-        if [ ! -f ".env.example" ] && [ -f "../.env.example" ]; then
-            log_info "从上级目录复制.env.example..."
-            cp ../.env.example ./
+        # 尝试从backend目录查找
+        if [ ! -f ".env.example" ] && [ -f "backend/.env.example" ]; then
+            log_info "从backend目录复制.env.example..."
+            cp backend/.env.example ./
             log_success "已复制.env.example到当前目录"
         fi
         
