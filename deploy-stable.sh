@@ -298,10 +298,123 @@ select_dockerfile_version() {
 }
 
 # ====================
+# 检查必要文件
+# ====================
+check_required_files() {
+    log_info "检查必要的配置文件..."
+    
+    local missing_files=()
+    
+    # 检查.env.example文件
+    if [ ! -f ".env.example" ] && [ ! -f "../.env.example" ]; then
+        missing_files+=(".env.example")
+    else
+        log_success "找到.env.example文件"
+    fi
+    
+    # 检查composer.json文件
+    if [ ! -f "backend/composer.json" ]; then
+        missing_files+=("backend/composer.json")
+    else
+        log_success "找到composer.json文件"
+    fi
+    
+    # 如果缺少文件，尝试修复
+    if [ ${#missing_files[@]} -gt 0 ]; then
+        log_warning "缺少必要的文件: ${missing_files[*]}"
+        
+        # 尝试从上级目录查找
+        if [ ! -f ".env.example" ] && [ -f "../.env.example" ]; then
+            log_info "从上级目录复制.env.example..."
+            cp ../.env.example ./
+            log_success "已复制.env.example到当前目录"
+        fi
+        
+        # 如果仍然缺少文件，尝试使用备用方案
+        for file in "${missing_files[@]}"; do
+            case $file in
+                ".env.example")
+                    if [ ! -f ".env.example" ]; then
+                        log_warning "创建默认的.env.example文件..."
+                        cat > .env.example << 'EOF'
+# Snipe-CN 默认环境配置
+# 请在部署后根据实际情况修改
+
+APP_NAME=Snipe-CN
+APP_ENV=production
+APP_KEY=
+APP_DEBUG=false
+APP_URL=http://localhost
+
+LOG_CHANNEL=stack
+LOG_LEVEL=debug
+
+DB_CONNECTION=mysql
+DB_HOST=db
+DB_PORT=3306
+DB_DATABASE=snipeit
+DB_USERNAME=snipeit
+DB_PASSWORD=password
+
+BROADCAST_DRIVER=log
+CACHE_DRIVER=file
+QUEUE_CONNECTION=sync
+SESSION_DRIVER=file
+SESSION_LIFETIME=120
+
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+MAIL_MAILER=smtp
+MAIL_HOST=mailhog
+MAIL_PORT=1025
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+MAIL_FROM_ADDRESS=admin@example.com
+MAIL_FROM_NAME="${APP_NAME}"
+
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=
+
+PUSHER_APP_ID=
+PUSHER_APP_KEY=
+PUSHER_APP_SECRET=
+PUSHER_APP_CLUSTER=mt1
+
+MIX_PUSHER_APP_KEY="${PUSHER_APP_KEY}"
+MIX_PUSHER_APP_CLUSTER="${PUSHER_APP_CLUSTER}"
+EOF
+                        log_success "已创建默认.env.example文件"
+                    fi
+                    ;;
+                "backend/composer.json")
+                    log_error "缺少核心文件: backend/composer.json"
+                    log_info "请确保从GitHub正确克隆项目"
+                    return 1
+                    ;;
+            esac
+        done
+    fi
+    
+    log_success "所有必要的配置文件检查完成"
+    return 0
+}
+
+# ====================
 # 构建函数（多方案保证成功）
 # ====================
 build_with_retry() {
     log_info "开始构建Docker镜像..."
+    
+    # 检查必要文件
+    check_required_files || {
+        log_error "必要的配置文件缺失，无法继续构建"
+        return 1
+    }
     
     # 检测网络连接
     check_network_connectivity

@@ -37,8 +37,9 @@ COPY --from=composer:2.6.6 /usr/bin/composer /usr/bin/composer
 # 设置工作目录
 WORKDIR /var/www/html
 
-# 复制composer配置
+# 复制必要的配置文件（包括.env.example）
 COPY composer.json composer.lock ./
+COPY ../.env.example .env.example 2>/dev/null || true
 
 # 设置Composer国内镜像（确保网络稳定性）
 RUN composer config -g repo.packagist composer https://mirrors.aliyun.com/composer/
