@@ -7,7 +7,7 @@ set -e
 # ====================
 # 配置区域
 # ====================
-SCRIPT_VERSION="1.6.3-stable"
+SCRIPT_VERSION="1.6.4-stable"
 SCRIPT_DATE="2026-03-13"
 
 # 颜色定义

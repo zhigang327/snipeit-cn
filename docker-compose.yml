@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
@@ -57,12 +55,12 @@ services:
       - redis
     networks:
       - snipe-cn-network
-    command: php artisan serve --host=0.0.0.0 --port=8000
+    command: startup.sh
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.stable
     container_name: snipe-cn-frontend
     restart: unless-stopped
     working_dir: /app
