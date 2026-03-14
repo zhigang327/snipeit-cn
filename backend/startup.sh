@@ -118,10 +118,19 @@ echo "检查数据库连接..."
 max_attempts=30
 attempt=1
 
+# 从 .env 读取数据库连接信息（优先使用环境变量）
+DB_HOST_VAL="${DB_HOST:-mysql}"
+DB_PORT_VAL="${DB_PORT:-3306}"
+DB_DATABASE_VAL="${DB_DATABASE:-snipeit}"
+DB_USERNAME_VAL="${DB_USERNAME:-snipeit}"
+DB_PASSWORD_VAL="${DB_PASSWORD:-password}"
+
 while [ $attempt -le $max_attempts ]; do
-    if php artisan db:check 2>/dev/null || php -r "
+    if php artisan db:monitor 2>/dev/null || \
+       php -r "
         try {
-            new PDO('mysql:host=db;port=3306', 'snipeit', 'password');
+            \$dsn = 'mysql:host=${DB_HOST_VAL};port=${DB_PORT_VAL};dbname=${DB_DATABASE_VAL}';
+            new PDO(\$dsn, '${DB_USERNAME_VAL}', '${DB_PASSWORD_VAL}');
             exit(0);
         } catch (PDOException \$e) {
             exit(1);
