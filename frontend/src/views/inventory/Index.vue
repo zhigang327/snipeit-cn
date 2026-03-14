@@ -526,7 +526,6 @@ const reviewDialogVisible = ref(false)
 const activeTab = ref('records')
 
 const taskDialogMode = ref('create')
-const taskDialogTitle = ref('')
 const currentTask = ref(null)
 const currentTaskId = ref(null)
 const currentRecord = ref(null)
