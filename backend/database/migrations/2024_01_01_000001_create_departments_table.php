@@ -22,9 +22,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            // 多级部门关系
+            // 多级部门关系（manager_id 外键在 users 表创建后的迁移中添加）
             $table->foreign('parent_id')->references('id')->on('departments')->onDelete('cascade');
-            $table->foreign('manager_id')->references('id')->on('users')->onDelete('set null');
 
             // 索引
             $table->index('parent_id');
