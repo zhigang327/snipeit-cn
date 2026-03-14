@@ -56,4 +56,4 @@ RUN chmod +x /usr/local/bin/startup.sh
 
 EXPOSE 9000
 
-CMD ["/usr/local/bin/startup.sh"]
+CMD ["bash", "/usr/local/bin/startup.sh"]
