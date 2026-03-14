@@ -62,7 +62,63 @@ success "Docker $(docker --version | grep -oP '[\d.]+' | head -1)"
 success "Compose $(docker-compose version 2>&1 | grep -oP '[\d.]+' | head -1)"
 
 # ──────────────────────────────────────────
-# 3. 准备 .env
+# 3. 自动配置 Docker 镜像源（探测可用源）
+# ──────────────────────────────────────────
+info "探测可用的 Docker 镜像源..."
+
+# 候选镜像源列表（按优先级排列）
+MIRROR_CANDIDATES=(
+    "https://mirror.ccs.tencentyun.com"
+    "https://ccr.ccs.tencentyun.com"
+    "https://docker.mirrors.ustc.edu.cn"
+    "https://hub-mirror.c.163.com"
+    "https://mirror.baidubce.com"
+    "https://dockerhub.azk8s.cn"
+    "https://reg-mirror.qiniu.com"
+)
+
+WORKING_MIRRORS=()
+for mirror in "${MIRROR_CANDIDATES[@]}"; do
+    host=$(echo "$mirror" | sed 's|https://||')
+    if curl -sf --max-time 5 --head "https://${host}/v2/" >/dev/null 2>&1 \
+       || curl -sf --max-time 5 "https://${host}/" >/dev/null 2>&1; then
+        WORKING_MIRRORS+=("\"$mirror\"")
+        success "可用镜像源: $mirror"
+        # 找到 2 个就够了
+        [ ${#WORKING_MIRRORS[@]} -ge 2 ] && break
+    else
+        warn "不可用: $mirror"
+    fi
+done
+
+# 写入 daemon.json
+sudo mkdir -p /etc/docker
+if [ ${#WORKING_MIRRORS[@]} -gt 0 ]; then
+    MIRROR_JSON=$(printf '%s,' "${WORKING_MIRRORS[@]}")
+    MIRROR_JSON="[${MIRROR_JSON%,}]"
+    sudo tee /etc/docker/daemon.json >/dev/null <<EOF
+{
+  "registry-mirrors": ${MIRROR_JSON},
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "50m", "max-file": "3" }
+}
+EOF
+    sudo systemctl reload docker 2>/dev/null || sudo systemctl restart docker 2>/dev/null || true
+    success "镜像源配置完成: ${WORKING_MIRRORS[*]}"
+else
+    warn "所有国内镜像源均不可用，将直连 Docker Hub（可能较慢）"
+    # 至少写一个基础配置（无镜像源，但有日志限制）
+    sudo tee /etc/docker/daemon.json >/dev/null <<'EOF'
+{
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "50m", "max-file": "3" }
+}
+EOF
+    sudo systemctl reload docker 2>/dev/null || sudo systemctl restart docker 2>/dev/null || true
+fi
+
+# ──────────────────────────────────────────
+# 4. 准备 .env
 # ──────────────────────────────────────────
 info "准备 .env 配置..."
 
