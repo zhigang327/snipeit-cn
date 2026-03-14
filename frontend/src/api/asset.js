@@ -60,3 +60,15 @@ export const getAssetStatistics = () => {
     method: 'get'
   })
 }
+
+// default export 供使用 import assetApi from '@/api/asset' 的地方调用
+export default {
+  list: getAssets,
+  get: getAsset,
+  create: createAsset,
+  update: updateAsset,
+  delete: deleteAsset,
+  checkout: checkoutAsset,
+  checkin: checkinAsset,
+  statistics: getAssetStatistics
+}
