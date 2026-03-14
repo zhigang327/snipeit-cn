@@ -1,181 +1,98 @@
-#!/bin/bash
-
-# Snipe-CN 应用启动脚本
-# 在容器启动时执行必要的初始化任务
-# 版本: 1.0.0
-# 日期: 2026-03-12
-
+#!/bin/sh
 set -e
 
-echo "========================================"
-echo "  Snipe-CN 应用启动初始化"
-echo "========================================"
-echo ""
+echo "========================================="
+echo "  Snipe-CN 启动初始化"
+echo "========================================="
 
-# 切换到应用目录
-cd /var/www/html || { echo "错误: 无法切换到应用目录"; exit 1; }
+APP_DIR="/var/www/html"
+cd "$APP_DIR"
 
-# 1. 检查artisan文件
-if [ ! -f "artisan" ]; then
-    echo "错误: artisan文件不存在"
-    echo "请确保应用代码正确部署"
-    exit 1
-fi
+# ---------- 1. 检查 artisan ----------
+[ -f artisan ] || { echo "[ERROR] artisan 文件不存在，请检查镜像构建"; exit 1; }
+echo "[OK] artisan 存在"
 
-echo "✓ artisan文件存在"
-
-# 2. 检查.env文件
-if [ ! -f ".env" ]; then
-    echo "创建.env文件..."
-    if [ -f ".env.example" ]; then
+# ---------- 2. 准备 .env ----------
+if [ ! -f .env ]; then
+    if [ -f .env.example ]; then
         cp .env.example .env
-        echo "✓ 从.env.example创建.env文件"
+        echo "[OK] 从 .env.example 创建 .env"
     else
-        echo "警告: .env.example文件不存在，创建默认.env文件"
-        cat > .env << 'EOF'
-APP_NAME=Snipe-CN
-APP_ENV=production
-APP_KEY=
-APP_DEBUG=false
-APP_URL=http://localhost
-
-LOG_CHANNEL=stack
-LOG_LEVEL=debug
-
-DB_CONNECTION=mysql
-DB_HOST=db
-DB_PORT=3306
-DB_DATABASE=snipeit
-DB_USERNAME=snipeit
-DB_PASSWORD=password
-
-BROADCAST_DRIVER=log
-CACHE_DRIVER=file
-QUEUE_CONNECTION=sync
-SESSION_DRIVER=file
-SESSION_LIFETIME=120
-EOF
-        echo "✓ 创建默认.env文件"
+        echo "[ERROR] 缺少 .env.example，无法创建 .env"; exit 1
     fi
 else
-    echo "✓ .env文件已存在"
+    echo "[OK] .env 已存在"
 fi
 
-# 3. 生成应用密钥（如果不存在）
-if ! grep -q "^APP_KEY=" .env; then
-    echo "生成应用密钥..."
-    
-    # 尝试使用artisan生成密钥
-    if php artisan key:generate --force 2>/dev/null; then
-        echo "✓ 使用artisan生成应用密钥"
-    else
-        echo "警告: artisan生成密钥失败，使用PHP生成"
-        # 使用PHP生成安全的随机密钥
-        php -r "\$key = 'base64:' . base64_encode(random_bytes(32)); file_put_contents('.env', preg_replace('/^APP_KEY=.*/m', 'APP_KEY=' . \$key, file_get_contents('.env')));"
-        echo "✓ 使用PHP生成应用密钥"
-    fi
+# 注入容器环境变量到 .env（docker-compose environment 优先）
+[ -n "$DB_HOST" ]     && sed -i "s|^DB_HOST=.*|DB_HOST=$DB_HOST|" .env
+[ -n "$DB_PORT" ]     && sed -i "s|^DB_PORT=.*|DB_PORT=$DB_PORT|" .env
+[ -n "$DB_DATABASE" ] && sed -i "s|^DB_DATABASE=.*|DB_DATABASE=$DB_DATABASE|" .env
+[ -n "$DB_USERNAME" ] && sed -i "s|^DB_USERNAME=.*|DB_USERNAME=$DB_USERNAME|" .env
+[ -n "$DB_PASSWORD" ] && sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$DB_PASSWORD|" .env
+[ -n "$REDIS_HOST" ]  && sed -i "s|^REDIS_HOST=.*|REDIS_HOST=$REDIS_HOST|" .env
+[ -n "$REDIS_PORT" ]  && sed -i "s|^REDIS_PORT=.*|REDIS_PORT=$REDIS_PORT|" .env
+[ -n "$APP_URL" ]     && sed -i "s|^APP_URL=.*|APP_URL=$APP_URL|" .env
+
+# ---------- 3. 生成 APP_KEY ----------
+if grep -q "^APP_KEY=$\|^APP_KEY=your\|^APP_KEY= *$" .env 2>/dev/null || ! grep -q "^APP_KEY=" .env 2>/dev/null; then
+    php artisan key:generate --force
+    echo "[OK] APP_KEY 已生成"
 else
-    echo "✓ 应用密钥已存在"
+    echo "[OK] APP_KEY 已存在"
 fi
 
-# 4. 设置目录权限
-echo "设置目录权限..."
-mkdir -p \
-    storage \
-    storage/framework \
-    storage/framework/sessions \
-    storage/framework/views \
-    storage/framework/cache \
-    storage/logs \
-    bootstrap/cache
+# ---------- 4. 目录权限 ----------
+mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache storage/logs bootstrap/cache
+chown -R www-data:www-data storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache
+echo "[OK] 目录权限设置完成"
 
-chown -R www-data:www-data \
-    storage \
-    bootstrap/cache
-
-chmod -R 775 \
-    storage \
-    bootstrap/cache
-
-echo "✓ 目录权限设置完成"
-
-# 5. 优化应用
-echo "优化应用..."
-if composer dump-autoload --optimize 2>/dev/null; then
-    echo "✓ 优化自动加载器"
-else
-    echo "⚠ 自动加载器优化跳过"
-fi
-
-if php artisan optimize 2>/dev/null; then
-    echo "✓ 优化应用"
-else
-    echo "⚠ 应用优化跳过"
-fi
-
-# 6. 检查数据库连接
-echo "检查数据库连接..."
-max_attempts=30
-attempt=1
-
-# 从 .env 读取数据库连接信息（优先使用环境变量）
-DB_HOST_VAL="${DB_HOST:-mysql}"
-DB_PORT_VAL="${DB_PORT:-3306}"
-DB_DATABASE_VAL="${DB_DATABASE:-snipeit}"
-DB_USERNAME_VAL="${DB_USERNAME:-snipeit}"
-DB_PASSWORD_VAL="${DB_PASSWORD:-password}"
-
-while [ $attempt -le $max_attempts ]; do
-    if php artisan db:monitor 2>/dev/null || \
-       php -r "
+# ---------- 5. 等待 MySQL ----------
+echo "[INFO] 等待 MySQL 就绪..."
+MAX=60
+i=1
+while [ $i -le $MAX ]; do
+    if php -r "
         try {
-            \$dsn = 'mysql:host=${DB_HOST_VAL};port=${DB_PORT_VAL};dbname=${DB_DATABASE_VAL}';
-            new PDO(\$dsn, '${DB_USERNAME_VAL}', '${DB_PASSWORD_VAL}');
+            \$pdo = new PDO(
+                'mysql:host=${DB_HOST:-mysql};port=${DB_PORT:-3306};dbname=${DB_DATABASE}',
+                '${DB_USERNAME}',
+                '${DB_PASSWORD}',
+                [PDO::ATTR_TIMEOUT => 3]
+            );
             exit(0);
-        } catch (PDOException \$e) {
+        } catch (Exception \$e) {
             exit(1);
         }
     " 2>/dev/null; then
-        echo "✓ 数据库连接成功 (尝试 $attempt/$max_attempts)"
+        echo "[OK] MySQL 连接成功（第 $i 次）"
         break
     fi
-    
-    if [ $attempt -eq $max_attempts ]; then
-        echo "警告: 数据库连接失败，应用可能无法正常工作"
-        echo "      请检查数据库服务是否正常运行"
-        break
-    fi
-    
-    echo "等待数据库... (尝试 $attempt/$max_attempts)"
+    echo "[WAIT] MySQL 未就绪，等待中... ($i/$MAX)"
     sleep 2
-    attempt=$((attempt + 1))
+    i=$((i + 1))
 done
 
-# 7. 运行数据库迁移（如果配置了数据库）
-if grep -q "^DB_CONNECTION=mysql" .env; then
-    echo "运行数据库迁移..."
-    if php artisan migrate --force 2>/dev/null; then
-        echo "✓ 数据库迁移完成"
-    else
-        echo "⚠ 数据库迁移失败，将在后续重试"
-    fi
+if [ $i -gt $MAX ]; then
+    echo "[WARN] MySQL 连接超时，继续启动（迁移将跳过）"
 fi
 
-# 8. 清理缓存
-echo "清理缓存..."
-php artisan config:clear 2>/dev/null || true
-php artisan route:clear 2>/dev/null || true
-php artisan view:clear 2>/dev/null || true
-php artisan cache:clear 2>/dev/null || true
+# ---------- 6. 数据库迁移 ----------
+if php artisan migrate --force 2>&1; then
+    echo "[OK] 数据库迁移完成"
+else
+    echo "[WARN] 数据库迁移失败，检查数据库连接和表结构"
+fi
 
-echo "✓ 缓存清理完成"
+# ---------- 7. 清理缓存、优化 ----------
+php artisan config:cache  2>/dev/null || true
+php artisan route:cache   2>/dev/null || true
+php artisan view:cache    2>/dev/null || true
+echo "[OK] 缓存优化完成"
 
-echo ""
-echo "========================================"
-echo "  应用启动初始化完成"
-echo "========================================"
-echo ""
+echo "========================================="
+echo "  初始化完成，启动 PHP-FPM"
+echo "========================================="
 
-# 9. 启动PHP-FPM
-echo "启动PHP-FPM服务..."
-exec php-fpm "$@"
+exec php-fpm

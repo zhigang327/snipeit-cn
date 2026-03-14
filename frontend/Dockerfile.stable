@@ -1,59 +1,40 @@
-# Snipe-CN前端稳定版Dockerfile
-# 版本: 1.6.6-stable
-# 包含国内镜像加速和构建优化
+FROM node:18-alpine AS builder
 
-FROM node:18-alpine
-
-# 设置时区
 ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 安装必要的系统工具
-RUN apk update && apk add --no-cache \
-    git \
-    curl \
-    wget \
-    python3 \
-    make \
-    g++ \
-    && rm -rf /var/cache/apk/*
-
-# 设置工作目录
 WORKDIR /app
 
-# 复制package配置文件（如果package-lock.json不存在，使用npm install）
+# 先复制依赖描述文件，利用层缓存
 COPY package.json ./
 
-# 配置npm国内镜像（如果在中国大陆）
-RUN npm config set registry https://registry.npmmirror.com/
+# 配置国内镜像，安装依赖
+RUN npm config set registry https://registry.npmmirror.com/ \
+    && npm install --no-audit --progress=false
 
-# 清理npm缓存
-RUN npm cache clean --force
-
-# 安装依赖（三重保障方案）
-RUN echo "开始安装Node.js依赖..." && \
-    # 方法1: 标准安装
-    npm install --no-audit --progress=false || \
-    # 方法2: 如果方法1失败，清理缓存后重试
-    (echo "第一次安装失败，清理缓存后重试..." && \
-     npm cache clean --force && \
-     npm install --no-audit --progress=false --legacy-peer-deps)
-
-# 复制源代码
+# 复制源码并构建
 COPY . .
+RUN npm run build
 
-# 构建应用（生产环境）
-RUN if [ "$NODE_ENV" = "production" ]; then \
-        echo "构建生产版本..." && \
-        npm run build; \
-    fi
+# ---- 最终镜像：只保留构建产物 ----
+FROM nginx:alpine
 
-# 暴露端口
-EXPOSE 5173
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:5173', (res) => { if(res.statusCode === 200) process.exit(0); else process.exit(1); })" || exit 1
+# 将构建产物复制到 nginx 默认目录
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# 启动命令
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# 前端路由支持（SPA fallback）
+RUN printf 'server {\n\
+    listen 80;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+    location / {\n\
+        try_files $uri $uri/ /index.html;\n\
+    }\n\
+}\n' > /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
