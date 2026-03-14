@@ -5,6 +5,10 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 WORKDIR /app
 
+# 声明构建参数（必须在 COPY/RUN 之前声明才能生效）
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+
 # 先复制依赖描述文件，利用层缓存
 COPY package.json ./
 
