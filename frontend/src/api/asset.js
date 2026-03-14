@@ -61,8 +61,8 @@ export const getAssetStatistics = () => {
   })
 }
 
-// default export 供使用 import assetApi from '@/api/asset' 的地方调用
-export default {
+// assetApi 具名导出，供 import { assetApi } from '@/api/export' 使用
+export const assetApi = {
   list: getAssets,
   get: getAsset,
   create: createAsset,
@@ -72,3 +72,6 @@ export default {
   checkin: checkinAsset,
   statistics: getAssetStatistics
 }
+
+// default export 供 import assetApi from '@/api/asset' 使用
+export default assetApi

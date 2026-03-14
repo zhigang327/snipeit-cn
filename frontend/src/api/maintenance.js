@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 
-export default {
+export const maintenanceApi = {
   // 获取维修记录列表
   list(params) {
     return request({
@@ -105,3 +105,5 @@ export default {
     })
   }
 }
+
+export default maintenanceApi

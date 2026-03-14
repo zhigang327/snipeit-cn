@@ -483,7 +483,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { borrowApi, assetApi, userApi } from '@/api'
+import { borrowApi } from '@/api/borrow'
+import assetApi from '@/api/asset'
+import userApi from '@/api/user'
 import dayjs from 'dayjs'
 
 // 数据定义
