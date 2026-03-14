@@ -16,13 +16,23 @@ RUN docker-php-ext-install pdo pdo_mysql mbstring bcmath zip opcache
 # Composer
 COPY --from=composer:2.6.6 /usr/bin/composer /usr/bin/composer
 
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    COMPOSER_PROCESS_TIMEOUT=600
+
 WORKDIR /var/www/html
 
 # 先只复制依赖描述文件，利用 Docker 层缓存
 COPY composer.json composer.lock ./
 
-# 配置阿里云镜像，安装依赖（不跑 scripts，避免依赖 .env）
-RUN composer config -g repo.packagist composer https://mirrors.aliyun.com/composer/ \
+# 配置国内镜像并安装依赖（不跑 scripts，避免依赖 .env）
+# 优先腾讯云镜像；lock 文件无效时先 update 生成再 install
+RUN composer config -g repo.packagist composer https://mirrors.cloud.tencent.com/composer/ 2>/dev/null \
+    || composer config -g repo.packagist composer https://mirrors.aliyun.com/composer/ \
+    && LOCK_SIZE=$(wc -c < composer.lock | tr -d ' ') \
+    && if [ "$LOCK_SIZE" -lt 100 ]; then \
+         echo "composer.lock 无效，先生成..."; \
+         composer update --no-install --no-scripts --no-interaction --ignore-platform-reqs --prefer-dist; \
+       fi \
     && composer install \
         --no-dev \
         --no-interaction \
