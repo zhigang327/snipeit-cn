@@ -7,8 +7,8 @@ set -e
 # ====================
 # 配置区域
 # ====================
-SCRIPT_VERSION="1.6.5-stable"
-SCRIPT_DATE="2026-03-13"
+SCRIPT_VERSION="1.6.8-stable"
+SCRIPT_DATE="2026-03-14"
 
 # 颜色定义
 RED='\033[0;31m'
@@ -44,22 +44,51 @@ check_docker() {
     if ! command -v docker &> /dev/null; then
         log_error "Docker未安装"
         echo "请先安装Docker:"
-        echo "  Ubuntu/Debian: curl -fsSL https://get.docker.com | sh"
-        echo "  CentOS/RHEL: curl -fsSL https://get.docker.com | sh"
+        echo "  curl -fsSL https://get.docker.com | sh"
         exit 1
     fi
-    
-    if ! command -v docker-compose &> /dev/null; then
-        log_error "Docker Compose未安装"
-        echo "请安装Docker Compose:"
-        echo "  sudo apt install docker-compose-plugin  # Ubuntu/Debian"
-        echo "  sudo yum install docker-compose-plugin  # CentOS/RHEL"
-        exit 1
+
+    # 检测 docker-compose 是否是损坏的 HTML 文件
+    if command -v docker-compose &> /dev/null; then
+        if head -c 9 "$(command -v docker-compose)" 2>/dev/null | grep -q '<!DOCTYPE'; then
+            log_warning "检测到损坏的 docker-compose（HTML文件），正在自动修复..."
+            sudo rm -f "$(command -v docker-compose)"
+        fi
     fi
-    
+
+    # 优先使用 docker compose（plugin 方式，现代 Docker 推荐）
+    if docker compose version &> /dev/null; then
+        log_success "检测到 docker compose plugin，使用新版调用方式"
+        # 创建兼容性包装脚本
+        if ! command -v docker-compose &> /dev/null; then
+            sudo tee /usr/local/bin/docker-compose > /dev/null << 'WRAPPER'
+#!/bin/sh
+exec docker compose "$@"
+WRAPPER
+            sudo chmod +x /usr/local/bin/docker-compose
+            log_success "已创建 docker-compose 兼容包装脚本"
+        fi
+    elif command -v docker-compose &> /dev/null; then
+        log_success "检测到独立版 docker-compose"
+    else
+        log_warning "docker-compose 未安装，正在自动安装..."
+        if sudo apt-get install -y docker-compose-plugin 2>/dev/null; then
+            sudo tee /usr/local/bin/docker-compose > /dev/null << 'WRAPPER'
+#!/bin/sh
+exec docker compose "$@"
+WRAPPER
+            sudo chmod +x /usr/local/bin/docker-compose
+            log_success "docker-compose-plugin 安装完成"
+        else
+            log_error "自动安装失败，请手动执行:"
+            echo "  sudo apt-get update && sudo apt-get install -y docker-compose-plugin"
+            exit 1
+        fi
+    fi
+
     docker_version=$(docker --version | awk '{print $3}' | cut -d',' -f1)
-    docker_compose_version=$(docker-compose --version | awk '{print $3}' | cut -d',' -f1)
-    
+    docker_compose_version=$(docker-compose --version 2>&1 | grep -oP '[\d]+\.[\d]+\.[\d]+' | head -1)
+
     log_success "Docker版本: $docker_version"
     log_success "Docker Compose版本: $docker_compose_version"
 }
