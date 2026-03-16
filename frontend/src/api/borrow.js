@@ -4,7 +4,7 @@ export const borrowApi = {
   // 获取借用记录列表
   getRecords(params) {
     return request({
-      url: '/api/borrow',
+      url: '/borrow',
       method: 'get',
       params,
     })
@@ -13,7 +13,7 @@ export const borrowApi = {
   // 获取单个借用记录
   getRecord(id) {
     return request({
-      url: `/api/borrow/${id}`,
+      url: `/borrow/${id}`,
       method: 'get',
     })
   },
@@ -21,7 +21,7 @@ export const borrowApi = {
   // 创建借用申请
   createBorrow(data) {
     return request({
-      url: '/api/borrow',
+      url: '/borrow',
       method: 'post',
       data,
     })
@@ -30,7 +30,7 @@ export const borrowApi = {
   // 审批借用申请
   approveBorrow(id) {
     return request({
-      url: `/api/borrow/${id}/approve`,
+      url: `/borrow/${id}/approve`,
       method: 'post',
     })
   },
@@ -38,7 +38,7 @@ export const borrowApi = {
   // 拒绝借用申请
   rejectBorrow(id, data) {
     return request({
-      url: `/api/borrow/${id}/reject`,
+      url: `/borrow/${id}/reject`,
       method: 'post',
       data,
     })
@@ -47,7 +47,7 @@ export const borrowApi = {
   // 确认借出资产
   confirmBorrow(id) {
     return request({
-      url: `/api/borrow/${id}/confirm-borrow`,
+      url: `/borrow/${id}/confirm-borrow`,
       method: 'post',
     })
   },
@@ -55,7 +55,7 @@ export const borrowApi = {
   // 归还资产
   returnAsset(id, data) {
     return request({
-      url: `/api/borrow/${id}/return`,
+      url: `/borrow/${id}/return`,
       method: 'post',
       data,
     })
@@ -64,7 +64,7 @@ export const borrowApi = {
   // 取消借用申请
   cancelBorrow(id, data = {}) {
     return request({
-      url: `/api/borrow/${id}/cancel`,
+      url: `/borrow/${id}/cancel`,
       method: 'post',
       data,
     })
@@ -73,7 +73,7 @@ export const borrowApi = {
   // 获取统计信息
   getStatistics() {
     return request({
-      url: '/api/borrow/statistics',
+      url: '/borrow/statistics',
       method: 'get',
     })
   },
@@ -81,7 +81,7 @@ export const borrowApi = {
   // 获取逾期记录
   getOverdue() {
     return request({
-      url: '/api/borrow/overdue',
+      url: '/borrow/overdue',
       method: 'get',
     })
   },
@@ -89,7 +89,7 @@ export const borrowApi = {
   // 检查并更新逾期记录
   checkOverdue() {
     return request({
-      url: '/api/borrow/check-overdue',
+      url: '/borrow/check-overdue',
       method: 'get',
     })
   },
@@ -97,7 +97,7 @@ export const borrowApi = {
   // 获取即将到期记录
   getUpcomingDue(params) {
     return request({
-      url: '/api/borrow/upcoming-due',
+      url: '/borrow/upcoming-due',
       method: 'get',
       params,
     })
@@ -106,7 +106,7 @@ export const borrowApi = {
   // 获取资产借用历史
   getAssetHistory(assetId) {
     return request({
-      url: `/api/assets/${assetId}/borrow/history`,
+      url: `/assets/${assetId}/borrow/history`,
       method: 'get',
     })
   },
@@ -114,7 +114,7 @@ export const borrowApi = {
   // 获取用户借用历史
   getUserHistory(userId) {
     return request({
-      url: userId ? `/api/users/${userId}/borrow/history` : '/api/users/borrow/history',
+      url: userId ? `/users/${userId}/borrow/history` : '/users/borrow/history',
       method: 'get',
     })
   },
@@ -122,7 +122,7 @@ export const borrowApi = {
   // 导出借用记录
   exportRecords(params) {
     return request({
-      url: '/api/borrow/export',
+      url: '/borrow/export',
       method: 'post',
       params,
     })

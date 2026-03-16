@@ -5,7 +5,7 @@ export const disposalApi = {
   // 获取报废记录列表
   getList(params) {
     return request({
-      url: '/api/disposal',
+      url: '/disposal',
       method: 'get',
       params
     })
@@ -14,7 +14,7 @@ export const disposalApi = {
   // 创建报废申请
   create(data) {
     return request({
-      url: '/api/disposal',
+      url: '/disposal',
       method: 'post',
       data
     })
@@ -23,7 +23,7 @@ export const disposalApi = {
   // 获取单个报废记录详情
   getDetail(id) {
     return request({
-      url: `/api/disposal/${id}`,
+      url: `/disposal/${id}`,
       method: 'get'
     })
   },
@@ -31,7 +31,7 @@ export const disposalApi = {
   // 更新报废申请
   update(id, data) {
     return request({
-      url: `/api/disposal/${id}`,
+      url: `/disposal/${id}`,
       method: 'put',
       data
     })
@@ -40,7 +40,7 @@ export const disposalApi = {
   // 审批报废申请
   approve(id, data) {
     return request({
-      url: `/api/disposal/${id}/approve`,
+      url: `/disposal/${id}/approve`,
       method: 'post',
       data
     })
@@ -49,7 +49,7 @@ export const disposalApi = {
   // 拒绝报废申请
   reject(id, data) {
     return request({
-      url: `/api/disposal/${id}/reject`,
+      url: `/disposal/${id}/reject`,
       method: 'post',
       data
     })
@@ -58,7 +58,7 @@ export const disposalApi = {
   // 完成报废流程
   complete(id) {
     return request({
-      url: `/api/disposal/${id}/complete`,
+      url: `/disposal/${id}/complete`,
       method: 'post'
     })
   },
@@ -66,7 +66,7 @@ export const disposalApi = {
   // 取消报废申请
   cancel(id) {
     return request({
-      url: `/api/disposal/${id}/cancel`,
+      url: `/disposal/${id}/cancel`,
       method: 'post'
     })
   },
@@ -74,7 +74,7 @@ export const disposalApi = {
   // 获取报废统计
   getStatistics(params) {
     return request({
-      url: '/api/disposal/statistics',
+      url: '/disposal/statistics',
       method: 'get',
       params
     })
@@ -83,7 +83,7 @@ export const disposalApi = {
   // 获取逾期未处理的报废申请
   getOverdue(params) {
     return request({
-      url: '/api/disposal/overdue',
+      url: '/disposal/overdue',
       method: 'get',
       params
     })
@@ -92,7 +92,7 @@ export const disposalApi = {
   // 获取资产报废历史
   getAssetHistory(assetId) {
     return request({
-      url: `/api/assets/${assetId}/disposal/history`,
+      url: `/assets/${assetId}/disposal/history`,
       method: 'get'
     })
   },
@@ -100,7 +100,7 @@ export const disposalApi = {
   // 导出报废记录
   export(params) {
     return request({
-      url: '/api/disposal/export',
+      url: '/disposal/export',
       method: 'post',
       data: params
     })
@@ -109,7 +109,7 @@ export const disposalApi = {
   // 删除报废记录
   delete(id) {
     return request({
-      url: `/api/disposal/${id}`,
+      url: `/disposal/${id}`,
       method: 'delete'
     })
   }

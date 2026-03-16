@@ -4,7 +4,7 @@ const userApi = {
   // 获取用户列表
   list(params) {
     return request({
-      url: '/api/users',
+      url: '/users',
       method: 'get',
       params
     })
@@ -13,7 +13,7 @@ const userApi = {
   // 获取单个用户
   get(id) {
     return request({
-      url: `/api/users/${id}`,
+      url: `/users/${id}`,
       method: 'get'
     })
   },
@@ -21,7 +21,7 @@ const userApi = {
   // 创建用户
   create(data) {
     return request({
-      url: '/api/users',
+      url: '/users',
       method: 'post',
       data
     })
@@ -30,7 +30,7 @@ const userApi = {
   // 更新用户
   update(id, data) {
     return request({
-      url: `/api/users/${id}`,
+      url: `/users/${id}`,
       method: 'put',
       data
     })
@@ -39,7 +39,7 @@ const userApi = {
   // 删除用户
   delete(id) {
     return request({
-      url: `/api/users/${id}`,
+      url: `/users/${id}`,
       method: 'delete'
     })
   }
