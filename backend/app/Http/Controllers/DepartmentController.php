@@ -58,7 +58,7 @@ class DepartmentController extends Controller
         // 检查是否形成循环引用
         if ($validated['parent_id']) {
             $parent = Department::find($validated['parent_id']);
-            $ancestors = $parent->ancestor_ids;
+            $ancestors = $parent->ancestor_ids ?? [];
             if (in_array($validated['parent_id'], $ancestors)) {
                 return response()->json([
                     'success' => false,

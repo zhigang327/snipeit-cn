@@ -87,7 +87,7 @@ class AssetController extends Controller
         $validated['status'] = 'ready';
 
         // 计算保修到期日期
-        if ($validated['purchase_date'] && $validated['warranty_months']) {
+        if (!empty($validated['purchase_date']) && !empty($validated['warranty_months'])) {
             $validated['warranty_expiry'] = date('Y-m-d', strtotime($validated['purchase_date'] . ' +' . $validated['warranty_months'] . ' months'));
         }
 
@@ -147,7 +147,7 @@ class AssetController extends Controller
         $validated['updated_by'] = auth()->id();
 
         // 计算保修到期日期
-        if (isset($validated['purchase_date']) && isset($validated['warranty_months'])) {
+        if (!empty($validated['purchase_date']) && !empty($validated['warranty_months'])) {
             $validated['warranty_expiry'] = date('Y-m-d', strtotime($validated['purchase_date'] . ' +' . $validated['warranty_months'] . ' months'));
         }
 
