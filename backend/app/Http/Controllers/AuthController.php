@@ -18,14 +18,16 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        if (!Auth::attempt($validated)) {
+        // 使用 Hash::check 手动验证，避免 api guard 不支持 attempt()
+        $user = User::where('email', $validated['email'])->first();
+
+        if (!$user || !Hash::check($validated['password'], $user->password)) {
             return response()->json([
                 'success' => false,
                 'message' => '邮箱或密码错误'
             ], 401);
         }
 
-        $user = Auth::user();
         $token = $user->createToken('auth-token')->plainTextToken;
 
         return response()->json([
