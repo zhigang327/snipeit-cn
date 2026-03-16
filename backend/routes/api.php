@@ -15,6 +15,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
+    // 用户管理
+    Route::get('/users/profile', [\App\Http\Controllers\UserController::class, 'profile']);
+    Route::post('/users/change-password', [\App\Http\Controllers\UserController::class, 'changePassword']);
+    Route::apiResource('users', \App\Http\Controllers\UserController::class);
+
     // 部门管理（固定路由必须在 apiResource 之前）
     Route::get('/departments/tree', [DepartmentController::class, 'getTree']);
     Route::apiResource('departments', DepartmentController::class);
