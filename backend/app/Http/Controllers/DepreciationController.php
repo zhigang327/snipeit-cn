@@ -7,6 +7,7 @@ use App\Models\DepreciationRecord;
 use App\Services\DepreciationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class DepreciationController extends Controller
 {

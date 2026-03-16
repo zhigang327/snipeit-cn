@@ -250,7 +250,8 @@ class MaintenanceService
                 'assigned' => '分配',
             ];
 
-            $content = "## 🔧 维修记录{$actionText[$action] ?? '更新'}通知\n\n" .
+            $actionLabel = $actionText[$action] ?? '更新';
+            $content = "## 🔧 维修记录{$actionLabel}通知\n\n" .
                        "> **资产名称**: {$asset->name}\n" .
                        "> **资产编号**: {$asset->asset_tag}\n" .
                        "> **维修标题**: {$record->title}\n" .
