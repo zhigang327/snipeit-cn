@@ -176,6 +176,18 @@ class Department extends Model
             ->get();
     }
 
+    // 获取所有祖先部门ID数组（用于循环引用检测）
+    public function getAncestorIdsAttribute(): array
+    {
+        $ids = [];
+        $parent = $this->parent;
+        while ($parent) {
+            $ids[] = $parent->id;
+            $parent = $parent->parent;
+        }
+        return $ids;
+    }
+
     // 检查是否是某个部门的子孙
     public function isDescendantOf($departmentId): bool
     {
