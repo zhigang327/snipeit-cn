@@ -149,17 +149,17 @@ class MaintenanceService
         $byType = $query->groupBy('type')->selectRaw('type, count(*) as count')->get()->keyBy('type');
         $byPriority = $query->groupBy('priority')->selectRaw('priority, count(*) as count')->get()->keyBy('priority');
 
-        $completedRecords = MaintenanceRecord::completed();
+        $completedQuery = MaintenanceRecord::where('status', 'completed');
         if ($startDate) {
-            $completedRecords->whereDate('completed_date', '>=', $startDate);
+            $completedQuery->whereDate('completed_date', '>=', $startDate);
         }
         if ($endDate) {
-            $completedRecords->whereDate('completed_date', '<=', $endDate);
+            $completedQuery->whereDate('completed_date', '<=', $endDate);
         }
 
-        $avgDuration = $completedRecords->avgRaw('DATEDIFF(completed_date, reported_date)');
-        $avgCost = $completedRecords->avg('actual_cost');
-        $totalCost = $completedRecords->sum('actual_cost');
+        $avgDuration = $completedQuery->avg(\Illuminate\Support\Facades\DB::raw('DATEDIFF(completed_date, reported_date)'));
+        $avgCost = $completedQuery->avg('actual_cost');
+        $totalCost = $completedQuery->sum('actual_cost');
 
         return [
             'total' => $total,
