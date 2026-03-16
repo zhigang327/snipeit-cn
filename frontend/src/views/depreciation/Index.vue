@@ -342,7 +342,7 @@ const loadAssets = async () => {
       page: pagination.value.page,
       per_page: pagination.value.per_page,
     }
-    const res = await assetApi.getList(params)
+    const res = await assetApi.list(params)
     assets.value = res.data.data
     pagination.value.total = res.data.total
   } catch (error) {

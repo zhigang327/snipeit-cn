@@ -234,12 +234,12 @@ watch(() => form.book_value, (newVal) => {
 // 方法
 const loadAvailableAssets = async () => {
   try {
-    const response = await assetApi.getList({
+    const response = await assetApi.list({
       status: 'available', // 只显示可用的资产
       per_page: 1000
     })
     
-    if (response.success) {
+    if (response.data && response.data.data) {
       availableAssets.value = response.data.data
     }
   } catch (error) {
