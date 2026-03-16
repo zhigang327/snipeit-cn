@@ -105,18 +105,25 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="分类" prop="category_id">
-              <el-select v-model="assetForm.category_id" placeholder="请选择分类">
-                <el-option label="电脑" :value="1" />
-                <el-option label="显示器" :value="2" />
-                <el-option label="打印机" :value="3" />
+              <el-select v-model="assetForm.category_id" placeholder="请选择分类" style="width: 100%;">
+                <el-option
+                  v-for="cat in categoryList"
+                  :key="cat.id"
+                  :label="cat.parent ? cat.parent.name + ' / ' + cat.name : cat.name"
+                  :value="cat.id"
+                />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="供应商">
-              <el-select v-model="assetForm.supplier_id" placeholder="请选择供应商" clearable>
-                <el-option label="供应商A" :value="1" />
-                <el-option label="供应商B" :value="2" />
+              <el-select v-model="assetForm.supplier_id" placeholder="请选择供应商" clearable style="width: 100%;">
+                <el-option
+                  v-for="sup in supplierList"
+                  :key="sup.id"
+                  :label="sup.name"
+                  :value="sup.id"
+                />
               </el-select>
             </el-form-item>
           </el-col>
@@ -174,9 +181,13 @@
     <el-dialog v-model="checkoutDialogVisible" title="分配资产" width="600px">
       <el-form :model="checkoutForm" :rules="checkoutRules" ref="checkoutFormRef" label-width="100px">
         <el-form-item label="使用人" prop="user_id">
-          <el-select v-model="checkoutForm.user_id" placeholder="请选择使用人" filterable>
-            <el-option label="张三" :value="1" />
-            <el-option label="李四" :value="2" />
+          <el-select v-model="checkoutForm.user_id" placeholder="请选择使用人" filterable style="width: 100%;">
+            <el-option
+              v-for="u in userList"
+              :key="u.id"
+              :label="u.name"
+              :value="u.id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="部门" prop="department_id">
@@ -204,9 +215,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { getAssets, createAsset, updateAsset, deleteAsset, checkoutAsset, checkinAsset } from '@/api/asset'
 import { getDepartmentTree } from '@/api/department'
+import { getCategories } from '@/api/category'
+import { getSuppliers } from '@/api/supplier'
+import userApi from '@/api/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const loading = ref(false)
@@ -217,6 +231,9 @@ const checkoutFormRef = ref(null)
 
 const tableData = ref([])
 const departmentTree = ref([])
+const categoryList = ref([])
+const supplierList = ref([])
+const userList = ref([])
 const currentAsset = ref(null)
 
 const searchForm = reactive({
@@ -456,10 +473,18 @@ const handleFormDialogClose = () => {
 onMounted(async () => {
   await loadAssets()
   try {
-    const response = await getDepartmentTree()
-    departmentTree.value = response.data
+    const [deptRes, catRes, supRes, userRes] = await Promise.allSettled([
+      getDepartmentTree(),
+      getCategories(),
+      getSuppliers(),
+      userApi.list({ per_page: 999 })
+    ])
+    if (deptRes.status === 'fulfilled') departmentTree.value = deptRes.value.data ?? []
+    if (catRes.status === 'fulfilled') categoryList.value = catRes.value.data.data ?? catRes.value.data
+    if (supRes.status === 'fulfilled') supplierList.value = supRes.value.data.data ?? supRes.value.data
+    if (userRes.status === 'fulfilled') userList.value = userRes.value.data.data ?? userRes.value.data
   } catch (error) {
-    console.error('Failed to load department tree:', error)
+    console.error('Failed to load options:', error)
   }
 })
 </script>

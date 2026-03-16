@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\AssetController;
+use App\Http\Controllers\AssetCategoryController;
+use App\Http\Controllers\SupplierController;
 
 // 公开路由
 Route::post('/login', [AuthController::class, 'login']);
@@ -25,6 +27,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('departments', DepartmentController::class);
     Route::get('/departments/{department}/statistics', [DepartmentController::class, 'statistics']);
     Route::post('/departments/{department}/move', [DepartmentController::class, 'move']);
+
+    // 资产分类管理
+    Route::apiResource('categories', AssetCategoryController::class)->parameters(['categories' => 'assetCategory']);
+
+    // 供应商管理
+    Route::apiResource('suppliers', SupplierController::class);
 
     // 资产管理（固定路由必须在 apiResource 之前）
     Route::get('/assets/statistics', [AssetController::class, 'statistics']);
