@@ -15,24 +15,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // 部门管理
-    Route::apiResource('departments', DepartmentController::class);
+    // 部门管理（固定路由必须在 apiResource 之前）
     Route::get('/departments/tree', [DepartmentController::class, 'getTree']);
+    Route::apiResource('departments', DepartmentController::class);
     Route::get('/departments/{department}/statistics', [DepartmentController::class, 'statistics']);
     Route::post('/departments/{department}/move', [DepartmentController::class, 'move']);
 
-    // 资产管理
+    // 资产管理（固定路由必须在 apiResource 之前）
+    Route::get('/assets/statistics', [AssetController::class, 'statistics']);
+    Route::post('/assets/qrcode/batch', [\App\Http\Controllers\AssetQRCodeController::class, 'batchGenerate']);
+    Route::post('/assets/scan', [\App\Http\Controllers\AssetQRCodeController::class, 'scan']);
     Route::apiResource('assets', AssetController::class);
     Route::post('/assets/{asset}/checkout', [AssetController::class, 'checkout']);
     Route::post('/assets/{asset}/checkin', [AssetController::class, 'checkin']);
-    Route::get('/assets/statistics', [AssetController::class, 'statistics']);
 
     // 二维码管理
     Route::post('/assets/{asset}/qrcode', [\App\Http\Controllers\AssetQRCodeController::class, 'generate']);
-    Route::post('/assets/qrcode/batch', [\App\Http\Controllers\AssetQRCodeController::class, 'batchGenerate']);
     Route::get('/assets/{asset}/qrcode/download', [\App\Http\Controllers\AssetQRCodeController::class, 'download']);
     Route::get('/assets/{asset}/qrcode/print', [\App\Http\Controllers\AssetQRCodeController::class, 'printLabel']);
-    Route::post('/assets/scan', [\App\Http\Controllers\AssetQRCodeController::class, 'scan']);
 
     // 盘点管理
     Route::apiResource('inventories', \App\Http\Controllers\InventoryController::class);
@@ -65,7 +65,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/depreciation/statistics', [
         \App\Http\Controllers\DepreciationController::class, 'statistics']);
 
-    // 维修管理
+    // 维修管理（固定路由必须在 apiResource 之前）
+    Route::get('/maintenance/statistics', [
+        \App\Http\Controllers\MaintenanceController::class, 'statistics']);
+    Route::get('/maintenance/overdue', [
+        \App\Http\Controllers\MaintenanceController::class, 'overdue']);
+    Route::post('/maintenance/export', [
+        \App\Http\Controllers\MaintenanceController::class, 'export']);
     Route::apiResource('maintenance', \App\Http\Controllers\MaintenanceController::class);
     Route::post('/maintenance/{maintenance}/assign', [
         \App\Http\Controllers\MaintenanceController::class, 'assign']);
@@ -73,16 +79,20 @@ Route::middleware('auth:sanctum')->group(function () {
         \App\Http\Controllers\MaintenanceController::class, 'complete']);
     Route::post('/maintenance/{maintenance}/cancel', [
         \App\Http\Controllers\MaintenanceController::class, 'cancel']);
-    Route::get('/maintenance/statistics', [
-        \App\Http\Controllers\MaintenanceController::class, 'statistics']);
-    Route::get('/maintenance/overdue', [
-        \App\Http\Controllers\MaintenanceController::class, 'overdue']);
     Route::get('/assets/{asset}/maintenance/history', [
         \App\Http\Controllers\MaintenanceController::class, 'assetHistory']);
-    Route::post('/maintenance/export', [
-        \App\Http\Controllers\MaintenanceController::class, 'export']);
 
-    // 借用管理
+    // 借用管理（固定路由必须在 apiResource 之前）
+    Route::get('/borrow/statistics', [
+        \App\Http\Controllers\BorrowController::class, 'statistics']);
+    Route::get('/borrow/overdue', [
+        \App\Http\Controllers\BorrowController::class, 'overdue']);
+    Route::get('/borrow/check-overdue', [
+        \App\Http\Controllers\BorrowController::class, 'checkOverdue']);
+    Route::get('/borrow/upcoming-due', [
+        \App\Http\Controllers\BorrowController::class, 'upcomingDue']);
+    Route::post('/borrow/export', [
+        \App\Http\Controllers\BorrowController::class, 'export']);
     Route::apiResource('borrow', \App\Http\Controllers\BorrowController::class);
     Route::post('/borrow/{borrow}/approve', [
         \App\Http\Controllers\BorrowController::class, 'approve']);
@@ -94,22 +104,18 @@ Route::middleware('auth:sanctum')->group(function () {
         \App\Http\Controllers\BorrowController::class, 'returnAsset']);
     Route::post('/borrow/{borrow}/cancel', [
         \App\Http\Controllers\BorrowController::class, 'cancel']);
-    Route::get('/borrow/statistics', [
-        \App\Http\Controllers\BorrowController::class, 'statistics']);
-    Route::get('/borrow/overdue', [
-        \App\Http\Controllers\BorrowController::class, 'overdue']);
-    Route::get('/borrow/check-overdue', [
-        \App\Http\Controllers\BorrowController::class, 'checkOverdue']);
-    Route::get('/borrow/upcoming-due', [
-        \App\Http\Controllers\BorrowController::class, 'upcomingDue']);
     Route::get('/assets/{asset}/borrow/history', [
         \App\Http\Controllers\BorrowController::class, 'assetHistory']);
     Route::get('/users/{user?}/borrow/history', [
         \App\Http\Controllers\BorrowController::class, 'userHistory']);
-    Route::post('/borrow/export', [
-        \App\Http\Controllers\BorrowController::class, 'export']);
 
-    // 报废管理
+    // 报废管理（固定路由必须在 apiResource 之前）
+    Route::get('/disposal/statistics', [
+        \App\Http\Controllers\DisposalController::class, 'statistics']);
+    Route::get('/disposal/overdue', [
+        \App\Http\Controllers\DisposalController::class, 'overdue']);
+    Route::post('/disposal/export', [
+        \App\Http\Controllers\DisposalController::class, 'export']);
     Route::apiResource('disposal', \App\Http\Controllers\DisposalController::class);
     Route::post('/disposal/{disposal}/approve', [
         \App\Http\Controllers\DisposalController::class, 'approve']);
@@ -119,14 +125,8 @@ Route::middleware('auth:sanctum')->group(function () {
         \App\Http\Controllers\DisposalController::class, 'complete']);
     Route::post('/disposal/{disposal}/cancel', [
         \App\Http\Controllers\DisposalController::class, 'cancel']);
-    Route::get('/disposal/statistics', [
-        \App\Http\Controllers\DisposalController::class, 'statistics']);
-    Route::get('/disposal/overdue', [
-        \App\Http\Controllers\DisposalController::class, 'overdue']);
     Route::get('/assets/{asset}/disposal/history', [
         \App\Http\Controllers\DisposalController::class, 'assetHistory']);
-    Route::post('/disposal/export', [
-        \App\Http\Controllers\DisposalController::class, 'export']);
 
     // 盘点管理
     Route::get('/inventory/tasks', [
