@@ -134,57 +134,74 @@ class MaintenanceService
      */
     public function getStatistics($startDate = null, $endDate = null)
     {
-        $query = MaintenanceRecord::query();
+        // 基础日期过滤条件闭包，复用
+        $applyDateFilter = function ($q) use ($startDate, $endDate) {
+            if ($startDate) {
+                $q->whereDate('reported_date', '>=', $startDate);
+            }
+            if ($endDate) {
+                $q->whereDate('reported_date', '<=', $endDate);
+            }
+        };
 
+        $total = MaintenanceRecord::where(function ($q) use ($applyDateFilter) {
+            $applyDateFilter($q);
+        })->count();
+
+        $byStatus = MaintenanceRecord::where(function ($q) use ($applyDateFilter) {
+            $applyDateFilter($q);
+        })->selectRaw('status, count(*) as count')->groupBy('status')->get()->keyBy('status');
+
+        $byType = MaintenanceRecord::where(function ($q) use ($applyDateFilter) {
+            $applyDateFilter($q);
+        })->selectRaw('type, count(*) as count')->groupBy('type')->get()->keyBy('type');
+
+        $byPriority = MaintenanceRecord::where(function ($q) use ($applyDateFilter) {
+            $applyDateFilter($q);
+        })->selectRaw('priority, count(*) as count')->groupBy('priority')->get()->keyBy('priority');
+
+        // 已完成记录单独查询
+        $completedBase = MaintenanceRecord::where('status', 'completed');
         if ($startDate) {
-            $query->whereDate('reported_date', '>=', $startDate);
-        }
-
-        if ($endDate) {
-            $query->whereDate('reported_date', '<=', $endDate);
-        }
-
-        $total = $query->count();
-        $byStatus = $query->groupBy('status')->selectRaw('status, count(*) as count')->get()->keyBy('status');
-        $byType = $query->groupBy('type')->selectRaw('type, count(*) as count')->get()->keyBy('type');
-        $byPriority = $query->groupBy('priority')->selectRaw('priority, count(*) as count')->get()->keyBy('priority');
-
-        $completedQuery = MaintenanceRecord::where('status', 'completed');
-        if ($startDate) {
-            $completedQuery->whereDate('completed_date', '>=', $startDate);
+            $completedBase->whereDate('completed_date', '>=', $startDate);
         }
         if ($endDate) {
-            $completedQuery->whereDate('completed_date', '<=', $endDate);
+            $completedBase->whereDate('completed_date', '<=', $endDate);
         }
 
-        $avgDuration = $completedQuery->avg(\Illuminate\Support\Facades\DB::raw('DATEDIFF(completed_date, reported_date)'));
-        $avgCost = $completedQuery->avg('actual_cost');
-        $totalCost = $completedQuery->sum('actual_cost');
+        $avgDuration = (clone $completedBase)
+            ->selectRaw('AVG(DATEDIFF(completed_date, reported_date)) as avg_days')
+            ->value('avg_days');
+
+        $avgCost  = (clone $completedBase)->avg('actual_cost');
+        $totalCost = (clone $completedBase)->sum('actual_cost');
+
+        $completedCount = $byStatus['completed']->count ?? 0;
 
         return [
             'total' => $total,
             'by_status' => [
-                'pending' => $byStatus['pending']->count ?? 0,
+                'pending'     => $byStatus['pending']->count ?? 0,
                 'in_progress' => $byStatus['in_progress']->count ?? 0,
-                'completed' => $byStatus['completed']->count ?? 0,
-                'cancelled' => $byStatus['cancelled']->count ?? 0,
+                'completed'   => $completedCount,
+                'cancelled'   => $byStatus['cancelled']->count ?? 0,
             ],
             'by_type' => [
                 'hardware' => $byType['hardware']->count ?? 0,
                 'software' => $byType['software']->count ?? 0,
-                'network' => $byType['network']->count ?? 0,
-                'other' => $byType['other']->count ?? 0,
+                'network'  => $byType['network']->count ?? 0,
+                'other'    => $byType['other']->count ?? 0,
             ],
             'by_priority' => [
-                'low' => $byPriority['low']->count ?? 0,
+                'low'    => $byPriority['low']->count ?? 0,
                 'medium' => $byPriority['medium']->count ?? 0,
-                'high' => $byPriority['high']->count ?? 0,
+                'high'   => $byPriority['high']->count ?? 0,
                 'urgent' => $byPriority['urgent']->count ?? 0,
             ],
-            'avg_duration_days' => round($avgDuration, 1),
-            'avg_cost' => round($avgCost, 2),
-            'total_cost' => round($totalCost, 2),
-            'completion_rate' => $total > 0 ? round(($byStatus['completed']->count ?? 0) / $total * 100, 1) : 0,
+            'avg_duration_days' => round((float)($avgDuration ?? 0), 1),
+            'avg_cost'          => round((float)($avgCost ?? 0), 2),
+            'total_cost'        => round((float)($totalCost ?? 0), 2),
+            'completion_rate'   => $total > 0 ? round($completedCount / $total * 100, 1) : 0,
         ];
     }
 
