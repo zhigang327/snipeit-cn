@@ -731,7 +731,6 @@ class InventoryController extends Controller
             }
             
             $tasks = $query->with(['assignee'])
-                ->orderBy('priority', 'desc')
                 ->orderBy('end_date', 'asc')
                 ->get();
             
