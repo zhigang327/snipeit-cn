@@ -648,9 +648,9 @@ const loadRecords = async () => {
 // 加载资产列表
 const loadAssets = async () => {
   try {
-    const response = await assetApi.getAssets({ per_page: 1000 })
+    const response = await assetApi.list({ per_page: 1000 })
     if (response.success) {
-      assetList.value = response.data.filter(asset => asset.status !== 'retired')
+      assetList.value = (response.data || []).filter(asset => asset.status !== 'retired')
     }
   } catch (error) {
     console.error('加载资产列表失败:', error)
@@ -660,9 +660,9 @@ const loadAssets = async () => {
 // 加载用户列表
 const loadUsers = async () => {
   try {
-    const response = await userApi.getUsers({ per_page: 1000 })
+    const response = await userApi.list({ per_page: 1000 })
     if (response.success) {
-      userList.value = response.data
+      userList.value = response.data || []
     }
   } catch (error) {
     console.error('加载用户列表失败:', error)
@@ -672,9 +672,9 @@ const loadUsers = async () => {
 // 加载可用资产（状态为ready）
 const loadAvailableAssets = async () => {
   try {
-    const response = await assetApi.getAssets({ status: 'ready', per_page: 1000 })
+    const response = await assetApi.list({ status: 'ready', per_page: 1000 })
     if (response.success) {
-      availableAssets.value = response.data
+      availableAssets.value = response.data || []
     }
   } catch (error) {
     console.error('加载可用资产失败:', error)
