@@ -338,13 +338,14 @@ const loadAssets = async () => {
   loading.value = true
   try {
     const params = {
-      ...searchForm.value,
       page: pagination.value.page,
       per_page: pagination.value.per_page,
     }
+    if (searchForm.value.search) params.search = searchForm.value.search
+    if (searchForm.value.depreciation_method) params.depreciation_method = searchForm.value.depreciation_method
     const res = await assetApi.list(params)
-    assets.value = res.data.data
-    pagination.value.total = res.data.total
+    assets.value = res.data?.data || []
+    pagination.value.total = res.data?.total || 0
   } catch (error) {
     ElMessage.error('加载资产列表失败')
   } finally {
@@ -355,7 +356,7 @@ const loadAssets = async () => {
 const loadStatistics = async () => {
   try {
     const res = await depreciationApi.getStatistics()
-    statistics.value = res.data.data
+    statistics.value = res.data || {}
   } catch (error) {
     console.error('加载统计失败:', error)
   }

@@ -29,26 +29,26 @@ class BorrowController extends Controller
         $query = BorrowRecord::query()->with(['asset', 'borrower', 'approver']);
 
         // 状态筛选
-        if ($request->has('status')) {
+        if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
 
         // 借用人筛选
-        if ($request->has('borrower_id')) {
+        if ($request->filled('borrower_id')) {
             $query->where('borrower_id', $request->borrower_id);
         }
 
         // 资产筛选
-        if ($request->has('asset_id')) {
+        if ($request->filled('asset_id')) {
             $query->where('asset_id', $request->asset_id);
         }
 
-        // 日期范围筛选
-        if ($request->has('start_date')) {
+        // 日期范围筛选（filled 会同时检查参数存在且非空字符串）
+        if ($request->filled('start_date')) {
             $query->whereDate('created_at', '>=', $request->start_date);
         }
         
-        if ($request->has('end_date')) {
+        if ($request->filled('end_date')) {
             $query->whereDate('created_at', '<=', $request->end_date);
         }
 
